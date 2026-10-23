@@ -1,0 +1,45 @@
+export const BOARD_SIZE = 8;
+export const COLORS = ['blue', 'cyan', 'orange', 'yellow', 'purple', 'green', 'red'] as const;
+export type BlockColor = (typeof COLORS)[number];
+export type CellOffset = { x: number; y: number };
+export type Cell = { color: BlockColor };
+export type Board = (Cell | null)[][];
+export type BlockShape = { id: string; cells: CellOffset[]; weight: number; color: BlockColor };
+export type Piece = { id: string; shapeId: string; cells: CellOffset[]; color: BlockColor };
+export type Difficulty = 'casual' | 'normal' | 'hard';
+export type GameMode = 'classic' | 'challenge';
+export type ClearResult = {
+  board: Board;
+  clearedRows: number[];
+  clearedColumns: number[];
+  clearedCellCount: number;
+  clearedLineCount: number;
+  clearedPositions: CellOffset[];
+};
+export type MoveFeedback = {
+  placed: CellOffset[];
+  clearedPositions: CellOffset[];
+  points: number;
+  lines: number;
+  combo: number;
+  color: BlockColor;
+};
+export type GameState = {
+  version: 1;
+  board: Board;
+  tray: (Piece | null)[];
+  score: number;
+  best: number;
+  combo: number;
+  totalLines: number;
+  moves: number;
+  seed: string;
+  rngState: number;
+  mode: GameMode;
+  difficulty: Difficulty;
+  status: 'playing' | 'over';
+  lastMove: MoveFeedback | null;
+};
+export type GameOptions = { seed?: string; mode?: GameMode; difficulty?: Difficulty; best?: number };
+export type Settings = { sound: boolean; showWelcome: boolean };
+export type SavedGame = { version: 1; game: GameState; settings: Settings };
