@@ -21,6 +21,7 @@ See [`docs/verification.md`](docs/verification.md) for the executed checks and t
 - Pointer-based mouse, trackpad and touch dragging, legal/illegal previews, and predicted line highlights.
 - Click/tap selection and placement, plus keyboard placement controls.
 - Placement points, line bonuses, consecutive-clear combos, best scores, particles and optional synthesized audio.
+- Three pickaxe uses per run: remove one occupied cell to make room, including when no piece fits. Remaining uses survive a reload.
 - Versioned, validated local saves that restore the board, remaining pieces, score, combo, seed, RNG position, mode, difficulty and settings.
 - Responsive portrait/landscape layouts, visible keyboard focus and reduced-motion support.
 - Unit and randomized simulation tests, a strict production build and GitHub Pages workflows.
@@ -53,6 +54,7 @@ Open the local address Vite prints. For an existing checkout with the committed 
 3. Fill a complete row or column to clear it. All completed lines clear together, and their intersection cells clear only once.
 4. Use all three pieces before receiving the next tray. An empty tray slot stays empty until then.
 5. Keep placing pieces for as long as any remaining piece fits. One unusable piece does not end the game if another one still fits.
+6. Choose **Pickaxe**, then tap one filled cell to remove it. Each run has three uses; empty cells and cancelling cost nothing. Tap Pickaxe again or press Escape to cancel. When no piece fits, the end-of-run dialog also offers a pickaxe so you can try to make room. Clearing a cell does not award points, spend a tray piece, advance a turn or break your combo. A new run restores all three uses.
 
 There is no gravity, timer or player-controlled rotation. A move that does not clear a line resets the consecutive-clear combo. Invalid drops leave the run unchanged. During touch dragging, the piece lifts above the finger to expose its target.
 
@@ -80,9 +82,11 @@ Every candidate tray makes three independent weighted selections. Duplicates are
 
 | Difficulty | Weight adjustments | Tray safeguards |
 | --- | --- | --- |
-| Casual | Shapes with up to 3 cells ×1.8; shapes with 5 or more cells ×0.5. | Complete three-piece sequence checked. |
-| Normal | Unmodified base weights. | Complete three-piece sequence checked. |
-| Hard | Shapes with up to 2 cells ×0.55; shapes with 5 or more cells ×1.8. | One independently randomized tray; no complete-sequence guarantee. |
+| Casual | Shapes with up to 3 cells ×2.16; shapes with 5 or more cells ×0.45. | Complete three-piece sequence checked. |
+| Normal | Shapes with up to 3 cells ×1.2; shapes with 5 or more cells ×0.9. | Complete three-piece sequence checked. |
+| Hard | Shapes with up to 2 cells ×0.66; 3-cell shapes ×1.2; shapes with 5 or more cells ×1.62. | One independently randomized tray; no complete-sequence guarantee. |
+
+These weights gently ease all three difficulties: small shapes receive 20% more weight and large shapes 10% less than in the original release. Four-cell shapes are unchanged. Weights are relative rather than direct probabilities. Seeds use the current generator rules; existing saves keep their board, tray, scores and progress when upgrading.
 
 For Casual and Normal, [`solver.ts`](src/game/solver.ts) searches piece orders and legal positions while simulating line clearing after every placement. It memoizes board/tray states and limits each candidate to 1,800 search nodes. Generation tries up to eight candidates. A search that runs out of budget is rejected conservatively even if an undiscovered solution may exist.
 
@@ -122,7 +126,7 @@ grid-burst/
 
 Game rules remain in pure TypeScript. `placePiece()` commits a single atomic transition and returns no change for invalid, duplicate or stale placements. Transient visual effects do not mutate the board or replay after a reload. Pointer coordinates are calculated from the current board rectangle, padding and gaps rather than fixed screen positions.
 
-Saves use `grid-burst:v1:save`; the separate `grid-burst:v1:best` record preserves best scores across run resets. Storage parsing verifies dimensions, colors, shape membership, piece identities, numeric values and game-over consistency. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing the best score.
+Saves use `grid-burst:v1:save`; the separate `grid-burst:v1:best` record preserves best scores across run resets. Storage parsing verifies dimensions, colors, shape membership, piece identities, numeric values, the remaining pickaxe allowance (0–3) and game-over consistency. Older v1 saves without a pickaxe field receive three uses while keeping their run. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing the best score.
 
 ## Tests and verification
 

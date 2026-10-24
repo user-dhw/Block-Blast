@@ -28,7 +28,7 @@ Using the local development server and the production preview:
 
 ### Reproducible row-clear smoke check
 
-Start Classic, Normal with seed **`browser-smoke`**. To start fresh when a matching game is already saved, use Settings → Replay seed rather than refreshing the same URL.
+Historical baseline from the original generator: Classic, Normal with seed **`browser-smoke`**. The October 25 weight adjustment changes seeded piece sequences, so the moves below document the original release rather than a replay recipe for the current build. To start fresh when a matching game is already saved, use Settings → Replay seed rather than refreshing the same URL.
 
 | Move | Tray slot | Target (visible row, column) | Score after move |
 | --- | --- | --- | --- |
@@ -52,4 +52,13 @@ Screenshots: [desktop](screenshot.jpg), [phone portrait](mobile.jpg). These show
 
 ## Verification limits
 
-Physical iPhone/Android dragging, Safari/Firefox-specific rendering, audible output and hardware haptics were not tested. Touch coordinate conversion is covered by unit tests; the real browser drag check used a mouse pointer. The GitHub Pages workflow is included and its repository base path was tested locally, but the project has **not been pushed or published** to GitHub Pages.
+Physical iPhone/Android dragging, Safari/Firefox-specific rendering, audible output and hardware haptics were not tested. Touch coordinate conversion is covered by unit tests; the real browser drag check used a mouse pointer. The repository now deploys to [GitHub Pages](https://user-dhw.github.io/Block-Blast/) through the root workflow on pushes to `main`.
+
+## October 25, 2026: gentle difficulty tuning and pickaxe
+
+- ESLint, all **95 unit/simulation tests** and a production build with `PAGES_BASE_PATH=/Block-Blast/` passed locally.
+- Piece distribution tests compare 3,072 generated pieces per difficulty against the original weights: small pieces become more common and large pieces less common, while Casual, Normal and Hard retain their relative difficulty.
+- Real browser checks confirmed one-cell removal, unchanged score after removal, empty clicks costing nothing, cancellation by button/keyboard, exactly three uses, disabled controls at zero, and a fresh run restoring three uses.
+- Reloading after one use retained **2/3** and the edited board. A legacy v1 save without a tool field retained its game and received **3/3**.
+- A temporary local fixture with a blocked checkerboard and horizontal domino tray verified the game-over rescue button, restored legal moves after clearing one cell, and successful placement afterward. Settings opened immediately after a terminal move remained visible after the delayed game-over interval. The fixture was removed before committing.
+- Browser viewport checks at **390×844**, **375×667** and **667×375** confirmed the pickaxe, new-game and help controls fit within the viewport with no horizontal document overflow. These are browser size checks, not physical-device touch tests.

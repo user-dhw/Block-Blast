@@ -1,4 +1,5 @@
 export const BOARD_SIZE = 8;
+export const PICKAXE_USES = 3;
 export const COLORS = ['blue', 'cyan', 'orange', 'yellow', 'purple', 'green', 'red'] as const;
 export type BlockColor = (typeof COLORS)[number];
 export type CellOffset = { x: number; y: number };
@@ -33,6 +34,7 @@ export type GameState = {
   combo: number;
   totalLines: number;
   moves: number;
+  pickaxesLeft: number;
   seed: string;
   rngState: number;
   mode: GameMode;

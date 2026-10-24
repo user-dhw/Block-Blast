@@ -1,6 +1,6 @@
 import { isGameOver } from '../game/placement';
 import { SHAPES } from '../game/shapes';
-import { BOARD_SIZE, COLORS } from '../game/types';
+import { BOARD_SIZE, COLORS, PICKAXE_USES } from '../game/types';
 import type { Board, GameState, Piece, SavedGame, Settings } from '../game/types';
 
 export const STORAGE_KEY = 'grid-burst:v1:save';
@@ -69,6 +69,9 @@ export function validateSave(value: unknown): SavedGame | null {
       }
     }
     if (ids.size === 0) return null;
+    // Existing v1 saves predate tools; only an absent field receives the allowance.
+    const pickaxesLeft = 'pickaxesLeft' in source ? source.pickaxesLeft : PICKAXE_USES;
+    if (!counter(pickaxesLeft) || pickaxesLeft > PICKAXE_USES) return null;
     if (!counter(source.score) || !counter(source.best) || source.best < source.score
       || !counter(source.combo) || !counter(source.totalLines) || !counter(source.moves)
       || source.combo > source.moves || typeof source.seed !== 'string' || !source.seed || source.seed.length > 256
@@ -80,6 +83,7 @@ export function validateSave(value: unknown): SavedGame | null {
     const game: GameState = {
       version: 1, board, tray, score: source.score, best: source.best,
       combo: source.combo, totalLines: source.totalLines, moves: source.moves,
+      pickaxesLeft,
       seed: source.seed, rngState: source.rngState, mode: source.mode,
       difficulty: source.difficulty, status: source.status, lastMove: null,
     };

@@ -4,6 +4,7 @@ import { createInitialBoard } from './initialBoard';
 import { canPlacePiece, createEmptyBoard, isGameOver, putPiece } from './placement';
 import { createRng, createSeed, seedToState } from './random';
 import { calculateScore } from './scoring';
+import { BOARD_SIZE, PICKAXE_USES } from './types';
 import type { GameOptions, GameState } from './types';
 
 export { createEmptyBoard } from './placement';
@@ -26,6 +27,7 @@ export function createGame(options: GameOptions = {}): GameState {
     combo: 0,
     totalLines: 0,
     moves: 0,
+    pickaxesLeft: PICKAXE_USES,
     seed,
     rngState: rng.state,
     mode,
@@ -69,6 +71,30 @@ export function placePiece(state: GameState, pieceId: string, x: number, y: numb
       lines: cleared.clearedLineCount,
       combo: score.combo,
       color: piece.color,
+    },
+  };
+}
+
+/** Remove one occupied cell without advancing the turn or the random generator. */
+export function usePickaxe(state: GameState, x: number, y: number): GameState | null {
+  if (!(state.pickaxesLeft > 0) || !Number.isInteger(x) || !Number.isInteger(y)
+    || x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) return null;
+  const cell = state.board[y][x];
+  if (!cell) return null;
+  const board = state.board.map((row) => row.map((item) => item ? { ...item } : null));
+  board[y][x] = null;
+  return {
+    ...state,
+    board,
+    pickaxesLeft: state.pickaxesLeft - 1,
+    status: isGameOver(board, state.tray) ? 'over' : 'playing',
+    lastMove: {
+      placed: [],
+      clearedPositions: [{ x, y }],
+      points: 0,
+      lines: 0,
+      combo: state.combo,
+      color: cell.color,
     },
   };
 }

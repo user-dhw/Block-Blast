@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGame, placePiece } from '../game/gameEngine';
+import { createGame, placePiece, usePickaxe as applyPickaxe } from '../game/gameEngine';
 import { getValidPlacements } from '../game/placement';
+import { PICKAXE_USES } from '../game/types';
 import type { BlockColor, Difficulty, GameMode, SavedGame } from '../game/types';
 import { BEST_STORAGE_KEY, clearSave, loadBest, loadSave, saveBest, saveGame, STORAGE_KEY, validateSave } from '../utils/storage';
 
@@ -52,6 +53,58 @@ describe('versioned, validated local persistence', () => {
       expect(loadSave()).toBeNull();
     }
     expect(validateSave(undefined)).toBeNull();
+  });
+
+  it.each([0, 1, 2, PICKAXE_USES])('round-trips %s remaining pickaxe uses', (pickaxesLeft) => {
+    const save = fixture();
+    save.game.pickaxesLeft = pickaxesLeft;
+    expect(saveGame(save.game, save.settings)).toBe(true);
+    expect(loadSave()?.game.pickaxesLeft).toBe(pickaxesLeft);
+  });
+
+  it('restores pickaxe removal and its remaining allowance without replaying effects', () => {
+    const start = fixture().game;
+    const piece = start.tray[0]!;
+    const target = getValidPlacements(start.board, piece)[0];
+    const placed = placePiece(start, piece.id, target.x, target.y)!;
+    const cell = placed.lastMove!.placed[0];
+    const used = applyPickaxe(placed, cell.x, cell.y)!;
+    expect(saveGame(used, settings)).toBe(true);
+    expect(loadSave()?.game).toEqual({ ...used, lastMove: null });
+    expect(loadSave()?.game.pickaxesLeft).toBe(PICKAXE_USES - 1);
+  });
+
+  it('migrates old v1 saves without losing progress, settings or the separate best score', () => {
+    const start = fixture().game;
+    const piece = start.tray[0]!;
+    const target = getValidPlacements(start.board, piece)[0];
+    const moved = placePiece(start, piece.id, target.x, target.y)!;
+    const legacyGame: Partial<SavedGame['game']> = { ...moved };
+    delete legacyGame.pickaxesLeft;
+    const legacy = { version: 1, game: legacyGame, settings: { sound: true, showWelcome: false } };
+    values.set(STORAGE_KEY, JSON.stringify(legacy));
+    saveBest(1000);
+    const loaded = loadSave()!;
+    expect(loaded.game).toEqual({ ...moved, pickaxesLeft: PICKAXE_USES, lastMove: null });
+    expect(loaded.settings).toEqual(legacy.settings);
+    expect(loadBest()).toBe(1000);
+    expect(saveGame(loaded.game, loaded.settings)).toBe(true);
+    expect(JSON.parse(values.get(STORAGE_KEY)!).game.pickaxesLeft).toBe(PICKAXE_USES);
+    expect(loadBest()).toBe(1000);
+  });
+
+  it.each([null, undefined, '3', -1, 4, 0.5, NaN, Infinity])('rejects an explicit invalid pickaxe allowance %s', (pickaxesLeft) => {
+    const save = fixture();
+    expect(validateSave({ ...save, game: { ...save.game, pickaxesLeft } })).toBeNull();
+  });
+
+  it('retains terminal saves even when pickaxe charges remain', () => {
+    const save = fixture();
+    save.game.board = save.game.board.map((row) => row.map(() => ({ color: 'blue' as const })));
+    save.game.status = 'over';
+    expect(save.game.pickaxesLeft).toBe(PICKAXE_USES);
+    expect(saveGame(save.game, save.settings)).toBe(true);
+    expect(loadSave()?.game).toEqual(save.game);
   });
 
   const invalidCases: [string, (save: SavedGame) => void][] = [

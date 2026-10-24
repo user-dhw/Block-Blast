@@ -7,7 +7,10 @@ function selectionWeight(shape: BlockShape, difficulty: Difficulty): number {
   const size = shape.cells.length;
   const factor = difficulty === 'casual' ? (size <= 3 ? 1.8 : size >= 5 ? 0.5 : 1)
     : difficulty === 'hard' ? (size <= 2 ? 0.55 : size >= 5 ? 1.8 : 1) : 1;
-  return shape.weight * factor;
+  // A small easing across every mode: favor 1–3 cells by 20%, and reduce 5+
+  // cells by 10%. Difficulty differences and the tray solver stay unchanged.
+  const easeFactor = size <= 3 ? 1.2 : size >= 5 ? 0.9 : 1;
+  return shape.weight * factor * easeFactor;
 }
 
 export function generateRandomPiece(rng: SeededRng, difficulty: Difficulty = 'normal', id?: string): Piece {

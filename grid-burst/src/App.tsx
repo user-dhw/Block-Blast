@@ -6,6 +6,7 @@ import Modal from './components/Modal';
 import { clearLines } from './game/clearing';
 import { canPlacePiece, getValidPlacements } from './game/placement';
 import { getComboMultiplier } from './game/scoring';
+import { PICKAXE_USES } from './game/types';
 import type { CellOffset, Difficulty, GameOptions, MoveFeedback } from './game/types';
 import { useGame } from './hooks/useGame';
 import { usePointerDrag } from './hooks/usePointerDrag';
@@ -17,7 +18,7 @@ const format = (value: number) => value.toLocaleString('en-US');
 const difficultyLabels: Record<Difficulty, string> = { casual: 'Casual', normal: 'Normal', hard: 'Hard' };
 
 export default function App() {
-  const { game, settings, setSettings, place, restart, storageAvailable } = useGame();
+  const { game, settings, setSettings, place, pick, restart, storageAvailable } = useGame();
   const [dialog, setDialog] = useState<Dialog>(game.status === 'over' ? 'over' : null);
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<CellOffset | null>(null);
@@ -27,15 +28,27 @@ export default function App() {
   const [effects, setEffects] = useState<(MoveFeedback & { key: number }) | null>(null);
   const [message, setMessage] = useState('');
   const [invalid, setInvalid] = useState(false);
+  const [pickaxeActive, setPickaxeActive] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const lockUntil = useRef(0);
+  const effectId = useRef(0);
+  const endTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const later = useCallback((callback: () => void, delay: number) => {
     const timer = setTimeout(() => { timers.current.delete(timer); callback(); }, delay);
     timers.current.add(timer);
+    return timer;
   }, []);
+  const cancelEndTimer = useCallback(() => {
+    if (endTimer.current !== null) {
+      clearTimeout(endTimer.current); timers.current.delete(endTimer.current); endTimer.current = null;
+    }
+  }, []);
+  const showDialog = useCallback((next: Dialog) => {
+    cancelEndTimer(); setDialog(next);
+  }, [cancelEndTimer]);
   const play = useSound(settings.sound);
-  const closeDialog = useCallback(() => setDialog(null), []);
+  const closeDialog = useCallback(() => showDialog(null), [showDialog]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -52,22 +65,56 @@ export default function App() {
     const feedback = next.lastMove;
     if (feedback) {
       lockUntil.current = Date.now() + (feedback.lines ? 480 : 100);
-      setEffects({ ...feedback, key: next.moves });
+      const key = ++effectId.current;
+      setEffects({ ...feedback, key });
       setMessage(feedback.lines ? (feedback.combo > 1 ? `COMBO ×${feedback.combo}!` : feedback.lines > 1 ? 'EXCELLENT!' : 'NICE CLEAR!') : `${feedback.placed.length} blocks. A little closer.`);
       play(feedback.lines ? feedback.combo > 1 ? 'combo' : 'clear' : 'place');
       if (feedback.lines && settings.sound) { try { navigator.vibrate?.(16); } catch { /* Optional browser capability. */ } }
-      later(() => setEffects(current => current?.key === next.moves ? null : current), 900);
+      later(() => setEffects(current => current?.key === key ? null : current), 900);
     }
-    if (next.status === 'over') later(() => { play('over'); setDialog('over'); }, 550);
-  }, [dialog, place, play, settings.sound, later]);
+    if (next.status === 'over') endTimer.current = later(() => { play('over'); showDialog('over'); }, 550);
+  }, [dialog, place, play, settings.sound, later, showDialog]);
 
   const selectPiece = useCallback((id: string) => {
+    setPickaxeActive(false);
     setSelected(id); setHover(null); play('pickup');
     setMessage('Choose a spot on the grid. Arrow keys move; Enter places.');
   }, [play]);
-  const pointer = usePointerDrag(boardRef, attemptPlace, selectPiece, !dialog && game.status === 'playing');
+  const pointer = usePointerDrag(boardRef, attemptPlace, selectPiece, !dialog && !pickaxeActive && game.status === 'playing');
   const piece = pointer.drag?.piece ?? game.tray.find(item => item?.id === selected) ?? null;
   const target = pointer.drag?.target ?? hover;
+  const hasBlocks = game.board.some(row => row.some(Boolean));
+  const canUsePickaxe = game.pickaxesLeft > 0 && hasBlocks;
+  const togglePickaxe = () => {
+    if (pickaxeActive) {
+      setPickaxeActive(false); setHover(null);
+      setMessage('Pickaxe cancelled. No uses spent.');
+      if (game.status === 'over') showDialog('over');
+      return;
+    }
+    if (!canUsePickaxe) return;
+    cancelEndTimer(); pointer.cancel(); setSelected(null); setHover(null); showDialog(null); setPickaxeActive(true);
+    setMessage(`Choose one occupied block to remove. ${game.pickaxesLeft} pickaxe uses left. Empty cells do not use a charge. Press Escape to cancel.`);
+    const y = game.board.findIndex(row => row.some(Boolean));
+    const x = game.board[y].findIndex(Boolean);
+    setKeyboardCell({ x, y });
+    later(() => boardRef.current?.querySelector<HTMLButtonElement>(`[data-cell="${x},${y}"]`)?.focus({ preventScroll: true }), 0);
+  };
+  const attemptPickaxe = (x: number, y: number) => {
+    if (dialog || Date.now() < lockUntil.current) return;
+    const next = pick(x, y);
+    if (!next) { setMessage('Choose a filled cell. No pickaxe use was spent.'); play('invalid'); return; }
+    cancelEndTimer(); setSelected(null); setHover(null);
+    lockUntil.current = Date.now() + 180;
+    const key = ++effectId.current;
+    if (next.lastMove) setEffects({ ...next.lastMove, key });
+    later(() => setEffects(current => current?.key === key ? null : current), 650);
+    play('clear');
+    const keepClearing = next.status === 'over' && next.pickaxesLeft > 0;
+    setPickaxeActive(keepClearing);
+    setMessage(keepClearing ? `Block cleared. No piece fits yet. Choose another block; ${next.pickaxesLeft} uses left.` : `Block cleared. ${next.pickaxesLeft} pickaxe uses left.`);
+    if (next.status === 'over' && !keepClearing) endTimer.current = later(() => showDialog('over'), 350);
+  };
   const preview = useMemo(() => {
     if (!piece || !target) return null;
     const valid = canPlacePiece(game.board, piece, target.x, target.y);
@@ -84,18 +131,19 @@ export default function App() {
   const start = (options: GameOptions = {}) => {
     timers.current.forEach(clearTimeout); timers.current.clear(); setInvalid(false);
     pointer.cancel(); lockUntil.current = 0;
-    restart(options); setSelected(null); setHover(null); setEffects(null); setDialog(null); setMessage('A fresh grid. Endless possibilities.');
+    endTimer.current = null; setPickaxeActive(false);
+    restart(options); setSelected(null); setHover(null); setEffects(null); showDialog(null); setMessage('A fresh grid. Endless possibilities.');
     if (window.location.search) window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
   };
   const requestNew = (options: GameOptions = {}) => {
-    if (game.moves === 0 && !options.seed) start(options);
-    else { setPending(options); setDialog('restart'); }
+    if (game.moves === 0 && game.pickaxesLeft === PICKAXE_USES && !options.seed) start(options);
+    else { setPending(options); showDialog('restart'); }
   };
   const modeButtons = <><button className={game.mode === 'classic' ? 'active' : ''} onClick={() => requestNew({ mode: 'classic' })}><Icon name="grid" />Classic</button><button className={game.mode === 'challenge' ? 'active' : ''} onClick={() => requestNew({ mode: 'challenge' })}><Icon name="sparkles" />Challenge</button></>;
 
   const onBoardKey = (event: KeyboardEvent<HTMLButtonElement>, x: number, y: number) => {
     const direction: Record<string, CellOffset> = { ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 }, ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 } };
-    if (event.key === 'Escape') { setSelected(null); setHover(null); return; }
+    if (event.key === 'Escape') return;
     const offset = direction[event.key];
     if (!offset) return;
     event.preventDefault();
@@ -106,14 +154,21 @@ export default function App() {
   const shareSeed = () => {
     const url = new URL(window.location.href);
     url.search = new URLSearchParams({ seed: game.seed, mode: game.mode, difficulty: game.difficulty }).toString();
-    if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(url.href).then(() => setMessage('Replay link copied. Share a little challenge.')).catch(() => { setSeedInput(url.href); setDialog('settings'); });
-    else { setSeedInput(url.href); setDialog('settings'); }
+    if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(url.href).then(() => setMessage('Replay link copied. Share a little challenge.')).catch(() => { setSeedInput(url.href); showDialog('settings'); });
+    else { setSeedInput(url.href); showDialog('settings'); }
   };
 
-  return <div className="app-shell">
+  return <div className="app-shell" onKeyDown={event => {
+    if (event.key !== 'Escape' || dialog) return;
+    setSelected(null); setHover(null);
+    if (pickaxeActive) {
+      setPickaxeActive(false); setMessage('Pickaxe cancelled. No uses spent.');
+      if (game.status === 'over') showDialog('over');
+    }
+  }}>
     <header className="site-header">
       <a className="brand" href="#" aria-label="Grid Burst home" onClick={event => event.preventDefault()}><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><span className="brand-name">grid<span>burst</span><span className="brand-dot">.</span></span><span className="brand-tagline">A LITTLE PLAY GOES A LONG WAY</span></a>
-      <nav className="header-actions" aria-label="Game options"><button className="text-button how-to-button" onClick={() => setDialog('help')}><Icon name="help" />How to play</button><span className="nav-divider" /><button className={`icon-button ${settings.sound ? 'sound-on' : ''}`} aria-label={settings.sound ? 'Mute sound' : 'Enable sound'} aria-pressed={settings.sound} onClick={() => setSettings(current => ({ ...current, sound: !current.sound }))}><Icon name={settings.sound ? 'sound' : 'muted'} /></button><button className="icon-button" aria-label="Open settings" onClick={() => { setSeedInput(game.seed); setDialog('settings'); }}><Icon name="settings" /></button></nav>
+      <nav className="header-actions" aria-label="Game options"><button className="text-button how-to-button" onClick={() => showDialog('help')}><Icon name="help" />How to play</button><span className="nav-divider" /><button className={`icon-button ${settings.sound ? 'sound-on' : ''}`} aria-label={settings.sound ? 'Mute sound' : 'Enable sound'} aria-pressed={settings.sound} onClick={() => setSettings(current => ({ ...current, sound: !current.sound }))}><Icon name={settings.sound ? 'sound' : 'muted'} /></button><button className="icon-button" aria-label="Open settings" onClick={() => { setSeedInput(game.seed); showDialog('settings'); }}><Icon name="settings" /></button></nav>
     </header>
 
     <main className="workspace">
@@ -129,35 +184,47 @@ export default function App() {
 
       <section className="game-panel" aria-label="Grid Burst game">
         <div className="mobile-modes"><div className="mode-switch" aria-label="Mobile game mode">{modeButtons}</div></div>
-        <div className="game-topbar"><span className="live-label"><span className="status-dot" />{game.mode === 'classic' ? 'CLASSIC MODE' : 'RANDOM CHALLENGE'}</span><div className="board-tools"><span className="difficulty-tag">{difficultyLabels[game.difficulty]}</span><button className="icon-button small" aria-label="Pause game" onClick={() => { setSeedInput(game.seed); setDialog('settings'); }}><Icon name="pause" /></button></div></div>
+        <div className="game-topbar"><span className="live-label"><span className="status-dot" />{game.mode === 'classic' ? 'CLASSIC MODE' : 'RANDOM CHALLENGE'}</span><div className="board-tools"><span className="difficulty-tag">{difficultyLabels[game.difficulty]}</span><button className="icon-button small" aria-label="Pause game" onClick={() => { setSeedInput(game.seed); showDialog('settings'); }}><Icon name="pause" /></button></div></div>
         <div className="score-panel"><div className="current-score"><span className="score-label">YOUR SCORE</span><strong className="score-number">{format(game.score)}</strong></div><div className="best-score"><span className="score-label"><Icon name="crown" className="crown-icon" />PERSONAL BEST</span><strong>{format(game.best)}</strong></div></div>
 
         <div className={`board-wrap ${invalid ? 'invalid-shake' : ''}`}>
-          <div className="board-frame"><div className="game-board" ref={boardRef} role="group" aria-label="8 by 8 puzzle board" onPointerLeave={() => { if (!pointer.drag) setHover(null); }}>
+          <div className="board-frame"><div className={`game-board ${pickaxeActive ? 'pickaxe-targeting' : ''}`} ref={boardRef} role="group" aria-label="8 by 8 puzzle board" onPointerLeave={() => { if (!pointer.drag) setHover(null); }}>
             {game.board.flatMap((row, y) => row.map((cell, x) => {
               const key = `${x},${y}`;
               const isPreview = preview?.positions.has(key);
               const placed = effects?.placed.some(item => item.x === x && item.y === y) && !effects.clearedPositions.some(item => item.x === x && item.y === y);
-              return <button key={key} type="button" data-cell={key} className={`game-cell ${cell ? `tile ${cell.color}` : ''} ${isPreview ? `tile ${piece?.color} ${preview?.valid ? 'preview-valid' : 'preview-invalid'}` : ''} ${preview?.lines.has(key) ? 'preview-line' : ''} ${placed ? 'just-placed' : ''}`} aria-label={`Row ${y + 1}, column ${x + 1}, ${cell ? `${cell.color} block` : 'empty'}`} tabIndex={keyboardCell.x === x && keyboardCell.y === y ? 0 : -1} disabled={game.status === 'over' || !!dialog} onFocus={() => { setKeyboardCell({ x, y }); if (selected) setHover({ x, y }); }} onPointerEnter={() => { if (!pointer.drag && selected) setHover({ x, y }); }} onKeyDown={event => onBoardKey(event, x, y)} onClick={() => { if (selected) attemptPlace(selected, x, y); else setMessage('Pick one of the three pieces below to begin.'); }} />;
+              return <button key={key} type="button" data-cell={key}
+                className={`game-cell ${cell ? `tile ${cell.color}` : ''} ${isPreview ? `tile ${piece?.color} ${preview?.valid ? 'preview-valid' : 'preview-invalid'}` : ''} ${preview?.lines.has(key) ? 'preview-line' : ''} ${placed ? 'just-placed' : ''} ${pickaxeActive && cell && hover?.x === x && hover.y === y ? 'pickaxe-target' : ''}`}
+                aria-label={`Row ${y + 1}, column ${x + 1}, ${cell ? `${cell.color} block${pickaxeActive ? ', remove with pickaxe' : ''}` : 'empty'}`}
+                tabIndex={keyboardCell.x === x && keyboardCell.y === y ? 0 : -1}
+                disabled={!!dialog || (game.status === 'over' && !pickaxeActive)}
+                onFocus={() => { setKeyboardCell({ x, y }); if (selected || pickaxeActive) setHover({ x, y }); }}
+                onPointerEnter={() => { if (!pointer.drag && (selected || pickaxeActive)) setHover({ x, y }); }}
+                onKeyDown={event => onBoardKey(event, x, y)}
+                onClick={() => { if (pickaxeActive) attemptPickaxe(x, y); else if (selected) attemptPlace(selected, x, y); else setMessage('Pick one of the three pieces below to begin.'); }} />;
             }))}
-            {effects && effects.lines > 0 && <div className="line-effects" key={`clear-${effects.key}`} aria-hidden="true">{effects.clearedPositions.map((cell, i) => <span className={`clear-flash ${effects.color}`} key={i} style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }} />)}</div>}
+            {effects && effects.clearedPositions.length > 0 && <div className="line-effects" key={`clear-${effects.key}`} aria-hidden="true">{effects.clearedPositions.map((cell, i) => <span className={`clear-flash ${effects.color}`} key={i} style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }} />)}</div>}
           </div></div>
           {game.combo > 1 && <span className="combo-badge" key={`combo-${game.moves}`}><Icon name="sparkles" />{getComboMultiplier(game.combo).toFixed(2).replace(/0$/, '')}× COMBO</span>}
-          {effects && <div className={`floating-score ${effects.lines ? 'has-clear' : ''}`} key={`score-${effects.key}`} aria-hidden="true">{effects.lines > 0 && <span>{effects.combo > 1 ? `COMBO ×${effects.combo}` : effects.lines > 1 ? 'EXCELLENT!' : 'NICE CLEAR!'}</span>}+{format(effects.points)}</div>}
+          {effects && effects.points > 0 && <div className={`floating-score ${effects.lines ? 'has-clear' : ''}`} key={`score-${effects.key}`} aria-hidden="true">{effects.lines > 0 && <span>{effects.combo > 1 ? `COMBO ×${effects.combo}` : effects.lines > 1 ? 'EXCELLENT!' : 'NICE CLEAR!'}</span>}+{format(effects.points)}</div>}
           {effects && effects.lines > 0 && Array.from({ length: 14 }, (_, i) => <i aria-hidden="true" className="particle" key={`${effects.key}-${i}`} style={{ '--particle-x': `${Math.cos(i * 2.4) * 145}px`, '--particle-y': `${Math.sin(i * 2.4) * 140 - 50}px`, '--particle-rotation': `${i * 63}deg`, animationDelay: `${i * 12}ms` } as CSSProperties} />)}
         </div>
 
-        <div className="tray-label"><span>YOUR NEXT MOVE</span><span className="tray-helper">{selected ? 'Choose a place on the grid' : 'Drag a block. Find its spot.'}</span></div>
+        <div className={`tray-label ${pickaxeActive ? 'pickaxe-prompt' : ''}`}><span>{pickaxeActive ? 'PICKAXE READY' : 'YOUR NEXT MOVE'}</span><span className="tray-helper">{pickaxeActive ? 'Tap a filled cell · tap Pickaxe to cancel' : selected ? 'Choose a place on the grid' : 'Drag a block. Find its spot.'}</span></div>
         <div className="piece-tray" aria-label="Available pieces">
           {game.tray.map((item, index) => {
             const fits = item ? getValidPlacements(game.board, item).length > 0 : false;
-            return <button key={item?.id ?? `used-${index}`} type="button" className={`piece-slot ${item?.id === selected ? 'selected' : ''} ${!item ? 'used' : !fits ? 'unavailable' : ''} ${pointer.drag?.piece.id === item?.id ? 'is-dragging' : ''}`} disabled={!item || game.status === 'over' || !!dialog} aria-label={item ? `Select piece ${index + 1}, ${item.color}, ${item.cells.length} blocks${fits ? '' : ', no space right now'}` : `Piece ${index + 1} placed`} aria-pressed={!!item && selected === item.id} onPointerDown={event => { if (item) pointer.onPiecePointerDown(event, item); }} onPointerMove={pointer.onPiecePointerMove} onPointerUp={pointer.onPiecePointerUp} onPointerCancel={pointer.onPiecePointerCancel} onLostPointerCapture={pointer.onPiecePointerCancel} onClick={event => { if (event.detail === 0 && item) selectPiece(item.id); }}>
+            return <button key={item?.id ?? `used-${index}`} type="button" className={`piece-slot ${item?.id === selected ? 'selected' : ''} ${!item ? 'used' : !fits ? 'unavailable' : ''} ${pointer.drag?.piece.id === item?.id ? 'is-dragging' : ''}`} disabled={!item || pickaxeActive || game.status === 'over' || !!dialog} aria-label={item ? `Select piece ${index + 1}, ${item.color}, ${item.cells.length} blocks${fits ? '' : ', no space right now'}` : `Piece ${index + 1} placed`} aria-pressed={!!item && selected === item.id} onPointerDown={event => { if (item) pointer.onPiecePointerDown(event, item); }} onPointerMove={pointer.onPiecePointerMove} onPointerUp={pointer.onPiecePointerUp} onPointerCancel={pointer.onPiecePointerCancel} onLostPointerCapture={pointer.onPiecePointerCancel} onClick={event => { if (event.detail === 0 && item) selectPiece(item.id); }}>
               {item ? <span className="tray-piece"><BlockPiece piece={item} /></span> : <span className="slot-check"><Icon name="check" /></span>}
             </button>;
           })}
         </div>
-        <div className="game-controls"><button className="button-primary" onClick={() => requestNew()}><Icon name="refresh" />{game.mode === 'challenge' ? 'New random challenge' : 'New game'}<Icon name="arrow" /></button><button className="button-secondary help-mobile" aria-label="How to play" onClick={() => setDialog('help')}><Icon name="help" /></button></div>
-        <div className="keyboard-hint"><Icon name="keyboard" /><span>Or select a block, then tap the grid.</span></div>
+        <div className="game-controls">
+          <button className={`button-secondary pickaxe-button ${pickaxeActive ? 'active' : ''}`} onClick={togglePickaxe} disabled={!canUsePickaxe || !!dialog} aria-pressed={pickaxeActive} aria-label={`${pickaxeActive ? 'Cancel' : 'Use'} pickaxe, ${game.pickaxesLeft} of ${PICKAXE_USES} left`} title={game.pickaxesLeft === 0 ? 'All three pickaxe uses spent. Start a new game to refill.' : !hasBlocks ? 'Place a piece first, then clear one block with a pickaxe.' : 'Remove one block. Three uses per game; empty cells cost nothing.'}><Icon name="pickaxe" /><span>Pickaxe</span><span className="pickaxe-count">{game.pickaxesLeft}/{PICKAXE_USES}</span></button>
+          <button className="button-primary" onClick={() => requestNew()}><Icon name="refresh" />{game.mode === 'challenge' ? 'New challenge' : 'New game'}<Icon name="arrow" /></button>
+          <button className="button-secondary help-mobile" aria-label="How to play" onClick={() => showDialog('help')}><Icon name="help" /></button>
+        </div>
+        <div className="keyboard-hint"><Icon name={pickaxeActive ? 'pickaxe' : 'keyboard'} /><span>{pickaxeActive ? 'Remove one block. Empty cells cost nothing. Esc cancels.' : 'Or select a block, then tap the grid.'}</span></div>
         <div className="sr-only" role="status" aria-live="polite">{message} Score {game.score}. {game.totalLines} lines cleared.</div>
         {!storageAvailable && <p className="storage-note">Browser storage is unavailable. This run will last until you close the page.</p>}
       </section>
@@ -171,15 +238,15 @@ export default function App() {
       </aside>
     </main>
 
-    <footer className="site-footer"><span className="footer-note"><span className="footer-dot" />A little break. A brighter mind.</span><span className="footer-right">MADE FOR THE MOMENT<span>✦</span><button className="footer-link" onClick={() => setDialog('help')}>Get in the flow<Icon name="arrow" /></button></span></footer>
+    <footer className="site-footer"><span className="footer-note"><span className="footer-dot" />A little break. A brighter mind.</span><span className="footer-right">MADE FOR THE MOMENT<span>✦</span><button className="footer-link" onClick={() => showDialog('help')}>Get in the flow<Icon name="arrow" /></button></span></footer>
 
     {pointer.drag && <div className="drag-ghost" style={{ left: pointer.drag.left, top: pointer.drag.top }} aria-hidden="true"><BlockPiece piece={pointer.drag.piece} cellSize={pointer.drag.cell} gap={pointer.drag.gap} /></div>}
 
     {dialog && <Modal label={dialog === 'help' ? 'How to play' : dialog === 'settings' ? 'Game settings' : dialog === 'over' ? 'Game over' : 'Start a new game'} onClose={closeDialog}>
-      {dialog === 'help' && <><div className="modal-eyebrow"><Icon name="sparkles" />A LITTLE ROOM TO PLAY</div><h2 className="modal-title">Find your flow.</h2><p className="modal-copy">A simple grid. A satisfying little challenge.</p><ol className="instruction-list"><li><strong>Find the perfect fit.</strong><span>Drag a piece onto the grid, or select it and tap a cell. Pieces keep their shape.</span></li><li><strong>Make a little space.</strong><span>Fill any row or column to clear it. Use all three pieces to get a fresh set.</span></li><li><strong>Keep it going.</strong><span>Consecutive line clears build your combo. The game ends when no remaining piece fits.</span></li></ol><div className="help-scoring">+1 per block · +100 per line · +50 per extra line<br />Clear combo: +0.25× each turn, up to 3×.</div><p className="modal-copy small-copy">Keyboard: Tab to select a piece. Tab to the board, use arrow keys, then Enter to place. Escape clears your selection. No timer, no rotation, no rush.</p><button className="button-primary" onClick={closeDialog}>Let’s play<Icon name="arrow" /></button></>}
-      {dialog === 'settings' && <><div className="modal-eyebrow">TAKE A BREATHER</div><h2 className="modal-title">Your kind of play.</h2><p className="modal-copy">Your grid is right where you left it.</p><div className="settings-row"><span>Sound effects</span><button className={`switch-button ${settings.sound ? 'active' : ''}`} role="switch" aria-checked={settings.sound} aria-label="Sound effects" onClick={() => setSettings(current => ({ ...current, sound: !current.sound }))}><span />{settings.sound ? 'On' : 'Off'}</button></div><label className="settings-row"><span>Difficulty</span><select value={game.difficulty} onChange={event => { setPending({ difficulty: event.target.value as Difficulty }); setDialog('restart'); }}><option value="casual">Casual</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label><p className="small-copy modal-copy">Casual favors small pieces. Normal checks for a playable tray. Hard uses unscreened weighted randomness.</p><form className="seed-form" onSubmit={event => { event.preventDefault(); let seed = seedInput.trim(); let mode = game.mode; let difficulty = game.difficulty; try { const params = new URL(seed).searchParams; if (params.get('seed')) { seed = params.get('seed')!; mode = params.get('mode') === 'classic' ? 'classic' : 'challenge'; const value = params.get('difficulty'); difficulty = value === 'casual' || value === 'hard' ? value : 'normal'; } } catch { /* A plain seed is valid too. */ } if (seed && seed.length <= 128) { setPending({ mode, seed, difficulty }); setDialog('restart'); } else setMessage('Use a seed between 1 and 128 characters.'); }}><label className="seed-input-label" htmlFor="challenge-seed">REPLAY A SEED OR REPLAY LINK</label><input id="challenge-seed" className="seed-input" value={seedInput} maxLength={256} onChange={event => setSeedInput(event.target.value)} required /><button className="button-secondary" type="submit"><Icon name="refresh" />Replay seed</button></form><p className="small-copy modal-copy">Current {game.mode} seed: <code>{game.seed}</code> · Best: {format(game.best)}</p><div className="modal-actions"><button className="button-primary" onClick={closeDialog}>Back to the grid<Icon name="arrow" /></button><button className="text-button reset-button" onClick={() => { setPending({}); setDialog('restart'); }}>Reset saved progress</button></div></>}
+      {dialog === 'help' && <><div className="modal-eyebrow"><Icon name="sparkles" />A LITTLE ROOM TO PLAY</div><h2 className="modal-title">Find your flow.</h2><p className="modal-copy">A simple grid. A satisfying little challenge.</p><ol className="instruction-list"><li><strong>Find the perfect fit.</strong><span>Drag a piece onto the grid, or select it and tap a cell. Pieces keep their shape.</span></li><li><strong>Make a little space.</strong><span>Fill any row or column to clear it. Use all three pieces to get a fresh set.</span></li><li><strong>Keep it going.</strong><span>Consecutive line clears build your combo. If no piece fits, use a pickaxe to make room or start fresh.</span></li><li><strong>A little help, three times.</strong><span>Choose Pickaxe, then tap one filled cell to remove it. Each run has 3 uses. Empty cells and cancelling cost nothing. Uses save with your progress.</span></li></ol><div className="help-scoring">+1 per block · +100 per line · +50 per extra line<br />Clear combo: +0.25× each turn, up to 3×.</div><p className="modal-copy small-copy">Keyboard: Tab to select a piece. Tab to the board, use arrow keys, then Enter to place. Escape clears your selection. No timer, no rotation, no rush.</p><button className="button-primary" onClick={closeDialog}>Let’s play<Icon name="arrow" /></button></>}
+      {dialog === 'settings' && <><div className="modal-eyebrow">TAKE A BREATHER</div><h2 className="modal-title">Your kind of play.</h2><p className="modal-copy">Your grid is right where you left it.</p><div className="settings-row"><span>Sound effects</span><button className={`switch-button ${settings.sound ? 'active' : ''}`} role="switch" aria-checked={settings.sound} aria-label="Sound effects" onClick={() => setSettings(current => ({ ...current, sound: !current.sound }))}><span />{settings.sound ? 'On' : 'Off'}</button></div><label className="settings-row"><span>Difficulty</span><select value={game.difficulty} onChange={event => { setPending({ difficulty: event.target.value as Difficulty }); showDialog('restart'); }}><option value="casual">Casual</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label><p className="small-copy modal-copy">Casual favors small pieces. Normal checks for a playable tray. Hard uses unscreened weighted randomness.</p><form className="seed-form" onSubmit={event => { event.preventDefault(); let seed = seedInput.trim(); let mode = game.mode; let difficulty = game.difficulty; try { const params = new URL(seed).searchParams; if (params.get('seed')) { seed = params.get('seed')!; mode = params.get('mode') === 'classic' ? 'classic' : 'challenge'; const value = params.get('difficulty'); difficulty = value === 'casual' || value === 'hard' ? value : 'normal'; } } catch { /* A plain seed is valid too. */ } if (seed && seed.length <= 128) { setPending({ mode, seed, difficulty }); showDialog('restart'); } else setMessage('Use a seed between 1 and 128 characters.'); }}><label className="seed-input-label" htmlFor="challenge-seed">REPLAY A SEED OR REPLAY LINK</label><input id="challenge-seed" className="seed-input" value={seedInput} maxLength={256} onChange={event => setSeedInput(event.target.value)} required /><button className="button-secondary" type="submit"><Icon name="refresh" />Replay seed</button></form><p className="small-copy modal-copy">Current {game.mode} seed: <code>{game.seed}</code> · Best: {format(game.best)}</p><div className="modal-actions"><button className="button-primary" onClick={closeDialog}>Back to the grid<Icon name="arrow" /></button><button className="text-button reset-button" onClick={() => { setPending({}); showDialog('restart'); }}>Reset saved progress</button></div></>}
       {dialog === 'restart' && <><div className="modal-eyebrow">A FRESH PERSPECTIVE</div><h2 className="modal-title">Ready for a new grid?</h2><p className="modal-copy">This run will end at {format(game.score)} points. Your personal best stays with you.</p>{pending.seed && <p className="replay-seed">Replay seed: <code>{pending.seed}</code></p>}<div className="modal-actions"><button className="button-primary" onClick={() => { clearSave(); start(pending); }}>Start fresh<Icon name="arrow" /></button><button className="button-secondary" onClick={closeDialog}>Keep playing</button></div></>}
-      {dialog === 'over' && <><div className="modal-eyebrow"><Icon name="crown" />{game.score >= game.best && game.score > 0 ? 'A NEW PERSONAL BEST' : 'A LITTLE BREAK, WELL SPENT'}</div><h2 className="modal-title">Look at you go.</h2><p className="modal-copy">No more pieces fit. Every good run makes room for another.</p><strong className="game-over-score">{format(game.score)}</strong><p className="modal-copy">{game.totalLines} lines cleared · Personal best {format(game.best)}</p><div className="modal-actions"><button className="button-primary" onClick={() => start()}>One more game<Icon name="arrow" /></button><button className="button-secondary" onClick={() => start({ seed: game.seed })}>Replay this seed</button></div></>}
+      {dialog === 'over' && <><div className="modal-eyebrow"><Icon name="crown" />{game.score >= game.best && game.score > 0 ? 'A NEW PERSONAL BEST' : 'A LITTLE BREAK, WELL SPENT'}</div><h2 className="modal-title">Look at you go.</h2><p className="modal-copy">{canUsePickaxe ? 'No pieces fit. Use a pickaxe to make room, or start a fresh game.' : 'No more pieces fit. Every good run makes room for another.'}</p><strong className="game-over-score">{format(game.score)}</strong><p className="modal-copy">{game.totalLines} lines cleared · Personal best {format(game.best)}</p><div className="modal-actions">{canUsePickaxe && <button className="button-secondary rescue-button" onClick={togglePickaxe}><Icon name="pickaxe" />Use pickaxe · {game.pickaxesLeft} left</button>}<button className="button-primary" onClick={() => start()}>One more game<Icon name="arrow" /></button><button className="button-secondary" onClick={() => start({ seed: game.seed })}>Replay this seed</button></div></>}
     </Modal>}
   </div>;
 }
