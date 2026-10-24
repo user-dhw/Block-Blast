@@ -297,6 +297,8 @@ button, a { touch-action: manipulation; }
 .button-secondary:hover { color: #fff; background: #2a364b; transform: translateY(-1px); }
 .button-primary svg, .button-secondary svg { width: 14px; height: 14px; }
 .game-controls > button { flex: 1; }
+.game-controls > .button-primary { min-width: 0; padding-inline: 10px; gap: 6px; }
+.game-controls > .button-primary > svg { display: none; }
 .game-controls > .help-mobile { flex: 0 0 43px; padding: 10px; }
 .game-controls > .pickaxe-button { flex: 0 0 auto; gap: 7px; padding-inline: 12px; }
 .pickaxe-count { min-width: 27px; padding: 3px 5px; border-radius: 5px; color: #d8e6bd; background: #c7f56812; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
