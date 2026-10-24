@@ -1,10 +1,10 @@
 import { clearLines } from './clearing';
 import { generatePieceTray } from './generator';
 import { createInitialBoard } from './initialBoard';
-import { canPlacePiece, createEmptyBoard, isGameOver, putPiece } from './placement';
+import { canPlacePiece, createEmptyBoard, getPlacementObstacles, isGameOver, putPiece } from './placement';
 import { createRng, createSeed, seedToState } from './random';
 import { calculateScore } from './scoring';
-import { BOARD_SIZE, PICKAXE_USES } from './types';
+import { PICKAXE_USES } from './types';
 import type { GameOptions, GameState } from './types';
 
 export { createEmptyBoard } from './placement';
@@ -75,27 +75,20 @@ export function placePiece(state: GameState, pieceId: string, x: number, y: numb
   };
 }
 
-/** Remove one occupied cell without advancing the turn or the random generator. */
-export function usePickaxe(state: GameState, x: number, y: number): GameState | null {
-  if (!(state.pickaxesLeft > 0) || !Number.isInteger(x) || !Number.isInteger(y)
-    || x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) return null;
-  const cell = state.board[y][x];
-  if (!cell) return null;
+/** Clear a blocked footprint, then commit the selected piece through the normal turn. */
+export function breakThrough(state: GameState, pieceId: string, x: number, y: number): GameState | null {
+  if (!(state.pickaxesLeft > 0)) return null;
+  const piece = state.tray.find((item) => item?.id === pieceId);
+  if (!piece) return null;
+  const removedPositions = getPlacementObstacles(state.board, piece, x, y);
+  if (!removedPositions || removedPositions.length === 0) return null;
   const board = state.board.map((row) => row.map((item) => item ? { ...item } : null));
-  board[y][x] = null;
+  for (const cell of removedPositions) board[cell.y][cell.x] = null;
+  const next = placePiece({ ...state, board, status: 'playing', pickaxesLeft: state.pickaxesLeft - 1 }, pieceId, x, y);
+  if (!next || !next.lastMove) return null;
   return {
-    ...state,
-    board,
-    pickaxesLeft: state.pickaxesLeft - 1,
-    status: isGameOver(board, state.tray) ? 'over' : 'playing',
-    lastMove: {
-      placed: [],
-      clearedPositions: [{ x, y }],
-      points: 0,
-      lines: 0,
-      combo: state.combo,
-      color: cell.color,
-    },
+    ...next,
+    lastMove: { ...next.lastMove, removedPositions },
   };
 }
 

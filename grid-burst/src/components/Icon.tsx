@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-type IconName = 'settings' | 'sound' | 'muted' | 'help' | 'refresh' | 'arrow' | 'crown' | 'sparkles' | 'grid' | 'check' | 'close' | 'pause' | 'leaf' | 'target' | 'keyboard' | 'chevron' | 'pickaxe';
+type IconName = 'settings' | 'sound' | 'muted' | 'help' | 'refresh' | 'arrow' | 'crown' | 'sparkles' | 'grid' | 'check' | 'close' | 'pause' | 'leaf' | 'target' | 'keyboard' | 'chevron' | 'hammer';
 const paths: Record<IconName, React.ReactNode> = {
   settings: <><path d="m9 3 .5 2a7 7 0 0 1 5 0l.5-2 3 2-1 2a7 7 0 0 1 2.5 4l2 .5v3l-2 .5a7 7 0 0 1-2.5 4l1 2-3 2-.5-2a7 7 0 0 1-5 0l-.5 2-3-2 1-2A7 7 0 0 1 4.5 15l-2-.5v-3l2-.5A7 7 0 0 1 7 7L6 5Z"/><circle cx="12" cy="12.5" r="3"/></>,
   sound: <><path d="M11 4 6 8H3v8h3l5 4Z"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>,
@@ -18,7 +18,7 @@ const paths: Record<IconName, React.ReactNode> = {
   target: <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></>,
   keyboard: <><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></>,
   chevron: <path d="m9 5 7 7-7 7"/>,
-  pickaxe: <><path d="m13 10-9 11-2-2 9-11M7 3c6-2 12 4 14 10l-6-4-4-4Z"/><path d="m11 5 4 4"/></>,
+  hammer: <><path d="m14 10-9 11-3-3 10-10"/><path d="m9 5 4-3 8 7-4 4Z"/><path d="m16 6 3 3"/></>,
 };
 
 export default function Icon({ name, className, style }: { name: IconName; className?: string; style?: CSSProperties }) {

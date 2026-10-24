@@ -300,16 +300,18 @@ button, a { touch-action: manipulation; }
 .game-controls > .button-primary { min-width: 0; padding-inline: 10px; gap: 6px; }
 .game-controls > .button-primary > svg { display: none; }
 .game-controls > .help-mobile { flex: 0 0 43px; padding: 10px; }
-.game-controls > .pickaxe-button { flex: 0 0 auto; gap: 7px; padding-inline: 12px; }
-.pickaxe-count { min-width: 27px; padding: 3px 5px; border-radius: 5px; color: #d8e6bd; background: #c7f56812; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pickaxe-button.active { color: var(--lime); border-color: #c7f56899; background: #344332; box-shadow: 0 0 0 2px #c7f56812; }
-.pickaxe-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
-.pickaxe-targeting .game-cell { cursor: crosshair; }
-.pickaxe-targeting .game-cell:not(.tile) { cursor: default; }
-.pickaxe-targeting .game-cell.tile { border-color: #c7f5684d; }
-.pickaxe-targeting .game-cell.tile:hover, .game-cell.pickaxe-target { outline: 2px solid var(--lime); outline-offset: -2px; filter: brightness(1.2); }
-.tray-label.pickaxe-prompt > span { color: var(--lime); }
-.tray-label.pickaxe-prompt .tray-helper { max-width: 68%; text-align: right; line-height: 1.4; }
+.game-controls > .rescue-button { flex: 0 0 auto; gap: 7px; padding-inline: 12px; }
+.rescue-count { min-width: 27px; padding: 3px 5px; border-radius: 5px; color: #d8e6bd; background: #c7f56812; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rescue-button.active { color: var(--lime); border-color: #c7f56899; background: #344332; box-shadow: 0 0 0 2px #c7f56812; }
+.rescue-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.rescue-targeting .game-cell { cursor: crosshair; }
+.game-cell.preview-obstacle { background: repeating-linear-gradient(135deg, #f6b65eaa 0 5px, #8b4e27dd 5px 10px); border: 2px solid #ffd08b; box-shadow: inset 0 0 9px #25110acc; }
+.game-cell.hammer-hit { animation: hammer-hit .4s ease-out; }
+.game-controls > .rescue-cancel { flex: 0 0 32%; }
+.game-controls > .rescue-confirm { color: #2b2211; background: #ffd08b; }
+@keyframes hammer-hit { 0% { box-shadow: 0 0 18px #ffd08b; filter: brightness(1.7); } 100% { filter: brightness(1); } }
+.tray-label.rescue-prompt > span { color: var(--lime); }
+.tray-label.rescue-prompt .tray-helper { display: block; max-width: 68%; text-align: right; line-height: 1.4; }
 .modal-actions > .rescue-button { flex-basis: 100%; color: var(--lime); border-color: #c7f56840; }
 .help-mobile { display: none; }
 .keyboard-hint { display: flex; align-items: center; justify-content: center; gap: 6px; color: #536078; text-align: center; font-size: 9px; line-height: 1.8; margin: 9px 0 0; }
@@ -464,7 +466,7 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
   .piece-cell { border-radius: 3px; border-bottom-width: 2px; }
   .tray-helper { margin: 9px 0 12px; font-size: 9px; min-height: 15px; }
   .game-controls { gap: 8px; margin-top: 10px; }
-  .game-controls > .pickaxe-button { gap: 5px; padding-inline: 9px; }
+  .game-controls > .rescue-button { gap: 5px; padding-inline: 9px; }
   .game-controls > .button-primary { min-width: 0; gap: 5px; padding-inline: 8px; }
   .game-controls > .button-primary > svg:last-child { display: none; }
   .help-mobile { display: inline-flex; }
@@ -523,7 +525,7 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
   .piece-grid { gap: 2px; }
   .tray-helper { display: none; }
   .game-controls { grid-column: 2; grid-row: 5; gap: 6px; padding-top: 9px; }
-  .game-controls > .pickaxe-button { padding-inline: 7px; gap: 4px; }
+  .game-controls > .rescue-button { padding-inline: 7px; gap: 4px; }
   .game-controls > .help-mobile { flex-basis: 33px; padding: 7px; }
   .game-controls > .button-primary > svg { display: none; }
   .button-primary, .button-secondary { min-height: 36px; font-size: 9px; padding: 7px; }

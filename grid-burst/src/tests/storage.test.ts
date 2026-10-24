@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGame, placePiece, usePickaxe as applyPickaxe } from '../game/gameEngine';
+import { breakThrough, createGame, placePiece } from '../game/gameEngine';
 import { getValidPlacements } from '../game/placement';
 import { PICKAXE_USES } from '../game/types';
 import type { BlockColor, Difficulty, GameMode, SavedGame } from '../game/types';
@@ -62,13 +62,12 @@ describe('versioned, validated local persistence', () => {
     expect(loadSave()?.game.pickaxesLeft).toBe(pickaxesLeft);
   });
 
-  it('restores pickaxe removal and its remaining allowance without replaying effects', () => {
+  it('restores breakthrough placement and its remaining allowance without replaying effects', () => {
     const start = fixture().game;
     const piece = start.tray[0]!;
-    const target = getValidPlacements(start.board, piece)[0];
-    const placed = placePiece(start, piece.id, target.x, target.y)!;
-    const cell = placed.lastMove!.placed[0];
-    const used = applyPickaxe(placed, cell.x, cell.y)!;
+    const cell = piece.cells[0];
+    start.board[cell.y][cell.x] = { color: 'blue' };
+    const used = breakThrough(start, piece.id, 0, 0)!;
     expect(saveGame(used, settings)).toBe(true);
     expect(loadSave()?.game).toEqual({ ...used, lastMove: null });
     expect(loadSave()?.game.pickaxesLeft).toBe(PICKAXE_USES - 1);

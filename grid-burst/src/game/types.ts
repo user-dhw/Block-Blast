@@ -20,6 +20,7 @@ export type ClearResult = {
 export type MoveFeedback = {
   placed: CellOffset[];
   clearedPositions: CellOffset[];
+  removedPositions?: CellOffset[];
   points: number;
   lines: number;
   combo: number;

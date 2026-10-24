@@ -21,7 +21,7 @@ See [`docs/verification.md`](docs/verification.md) for the executed checks and t
 - Pointer-based mouse, trackpad and touch dragging, legal/illegal previews, and predicted line highlights.
 - Click/tap selection and placement, plus keyboard placement controls.
 - Placement points, line bonuses, consecutive-clear combos, best scores, particles and optional synthesized audio.
-- Three pickaxe uses per run: remove one occupied cell to make room, including when no piece fits. Remaining uses survive a reload.
+- Three Rescue hammer uses per run: preview and break the occupied cells blocking a selected piece, then place it in one confirmed move, including when no piece fits. Remaining uses survive a reload.
 - Versioned, validated local saves that restore the board, remaining pieces, score, combo, seed, RNG position, mode, difficulty and settings.
 - Responsive portrait/landscape layouts, visible keyboard focus and reduced-motion support.
 - Unit and randomized simulation tests, a strict production build and GitHub Pages workflows.
@@ -50,11 +50,13 @@ Open the local address Vite prints. For an existing checkout with the committed 
 ## How to play
 
 1. Choose any of the three pieces. Drag it onto the board, or click/tap it and then choose its top-left target cell.
-2. Every occupied square must land inside the board on an empty cell. Pieces keep their shown orientation.
+2. For ordinary placements, every square of a piece must land inside the board on an empty cell. Pieces keep their shown orientation.
 3. Fill a complete row or column to clear it. All completed lines clear together, and their intersection cells clear only once.
 4. Use all three pieces before receiving the next tray. An empty tray slot stays empty until then.
 5. Keep placing pieces for as long as any remaining piece fits. One unusable piece does not end the game if another one still fits.
-6. Choose **Pickaxe**, then tap one filled cell to remove it. Each run has three uses; empty cells and cancelling cost nothing. Tap Pickaxe again or press Escape to cancel. When no piece fits, the end-of-run dialog also offers a pickaxe so you can try to make room. Clearing a cell does not award points, spend a tray piece, advance a turn or break your combo. A new run restores all three uses.
+6. Choose **Rescue**, then select a tray piece and tap or drop it at a target position. The preview marks only the occupied cells within that piece's exact footprint. Choose **Break & place** to remove those blocking cells and place the selected piece in one move. Each blocked placement costs one of the run's three uses, regardless of how many blocking cells it removes. The end-of-run dialog also offers Rescue so you can select a piece when no ordinary move fits.
+
+Cancelling a pending Rescue placement costs nothing, and a legal target with no blocking cells places normally without spending a use. A piece must fit entirely inside the board; out-of-bounds targets cannot be confirmed. A confirmed Rescue placement spends its tray piece, advances the turn and applies the usual placement points, line clears and combo rules. Destroying blocking cells awards no extra points. The tray refills after its last piece is placed, as with ordinary moves. A new run restores all three uses; refreshing keeps the remaining allowance.
 
 There is no gravity, timer or player-controlled rotation. A move that does not clear a line resets the consecutive-clear combo. Invalid drops leave the run unchanged. During touch dragging, the piece lifts above the finger to expose its target.
 
@@ -124,9 +126,9 @@ grid-burst/
 └── vite.config.ts
 ```
 
-Game rules remain in pure TypeScript. `placePiece()` commits a single atomic transition and returns no change for invalid, duplicate or stale placements. Transient visual effects do not mutate the board or replay after a reload. Pointer coordinates are calculated from the current board rectangle, padding and gaps rather than fixed screen positions.
+Game rules remain in pure TypeScript. Ordinary placements and confirmed Rescue placements commit a single atomic transition and return no change for invalid, duplicate or stale placements. A Rescue preview does not change the board or spend an allowance; confirmation removes only the occupied cells in the selected piece's footprint before applying normal placement and line clearing. Transient visual effects do not mutate the board or replay after a reload. Pointer coordinates are calculated from the current board rectangle, padding and gaps rather than fixed screen positions.
 
-Saves use `grid-burst:v1:save`; the separate `grid-burst:v1:best` record preserves best scores across run resets. Storage parsing verifies dimensions, colors, shape membership, piece identities, numeric values, the remaining pickaxe allowance (0–3) and game-over consistency. Older v1 saves without a pickaxe field receive three uses while keeping their run. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing the best score.
+Saves use `grid-burst:v1:save`; the separate `grid-burst:v1:best` record preserves best scores across run resets. Storage parsing verifies dimensions, colors, shape membership, piece identities, numeric values, the remaining Rescue allowance (0–3) and game-over consistency. Older v1 saves without a tool allowance receive three uses while keeping their run. Existing saved allowances are retained. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing the best score.
 
 ## Tests and verification
 

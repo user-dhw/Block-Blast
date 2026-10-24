@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createGame, placePiece, restartGame, usePickaxe as applyPickaxe } from '../game/gameEngine';
+import { breakThrough, createGame, placePiece, restartGame } from '../game/gameEngine';
 import type { GameOptions, GameState, Settings } from '../game/types';
 import { loadBest, loadSave, saveGame } from '../utils/storage';
 
@@ -37,11 +37,11 @@ export function useGame() {
     setGame(next);
   }, []);
 
-  const pick = useCallback((x: number, y: number) => {
-    const next = applyPickaxe(stateRef.current, x, y);
+  const rescue = useCallback((pieceId: string, x: number, y: number) => {
+    const next = breakThrough(stateRef.current, pieceId, x, y);
     if (next) { stateRef.current = next; setGame(next); }
     return next;
   }, []);
 
-  return { game, settings, setSettings, place, pick, restart, storageAvailable };
+  return { game, settings, setSettings, place, rescue, restart, storageAvailable };
 }
