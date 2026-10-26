@@ -1,1 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#10151e"/><g fill="#c7f568"><rect x="12" y="12" width="18" height="18" rx="4"/><rect x="34" y="12" width="18" height="18" rx="4"/><rect x="12" y="34" width="18" height="18" rx="4"/><rect x="34" y="34" width="18" height="18" rx="4" opacity=".5"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#27354b"/>
+      <stop offset=".5" stop-color="#141e2e"/>
+      <stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <radialGradient id="ambient" cx=".32" cy=".24" r=".75">
+      <stop stop-color="#b7e96a" stop-opacity=".11"/>
+      <stop offset=".7" stop-color="#b7e96a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lime" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#edffb7"/>
+      <stop offset=".38" stop-color="#d1f875"/>
+      <stop offset="1" stop-color="#a6d84d"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#b0d85b"/>
+      <stop offset="1" stop-color="#557e2c"/>
+    </linearGradient>
+    <linearGradient id="ghost" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#3c523b"/>
+      <stop offset="1" stop-color="#25372d"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f5ffd8" stop-opacity=".9"/>
+      <stop offset=".6" stop-color="#eaffbc" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#b5e564" stop-opacity=".1"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="17" flood-color="#030812" flood-opacity=".5"/>
+    </filter>
+    <g id="tile">
+      <rect y="16" width="278" height="278" rx="55" fill="url(#edge)"/>
+      <rect width="278" height="278" rx="55" fill="url(#lime)"/>
+      <rect x="3" y="3" width="272" height="272" rx="52" fill="none" stroke="url(#rim)" stroke-width="6"/>
+      <path d="M29 91V58c0-17 13-30 30-30h111" fill="none" stroke="#fff" stroke-opacity=".24" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </defs>
+  <!-- Full-bleed, opaque artwork; the operating system supplies its icon mask. -->
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <rect width="1024" height="1024" fill="url(#ambient)"/>
+  <g filter="url(#shadow)">
+    <rect x="530" y="534" width="278" height="278" rx="55" fill="#101d20"/>
+    <rect x="530" y="518" width="278" height="278" rx="55" fill="url(#ghost)" stroke="#8baa65" stroke-opacity=".24" stroke-width="3"/>
+    <path d="M552 597v-25c0-18 14-32 32-32h129" fill="none" stroke="#c8e695" stroke-opacity=".12" stroke-width="4" stroke-linecap="round"/>
+    <use href="#tile" x="216" y="204"/>
+    <use href="#tile" x="530" y="204"/>
+    <use href="#tile" x="216" y="518"/>
+  </g>
+</svg>

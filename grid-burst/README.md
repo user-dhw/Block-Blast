@@ -47,6 +47,14 @@ Open the local address Vite prints. For an existing checkout with the committed 
 | `npm run build` | Check strict TypeScript and build `dist/`. |
 | `npm run preview` | Serve the production build locally. |
 
+## Add to your iPhone Home Screen
+
+1. Open [Grid Burst](https://user-dhw.github.io/Block-Blast/) in **Safari** on your iPhone.
+2. Tap **Share**, then **Add to Home Screen**.
+3. Keep the name **Grid Burst** and tap **Add**.
+
+The website includes dedicated Home Screen icons and standalone launch metadata. iOS can cache icons for existing shortcuts; if an older shortcut keeps its previous icon, remove that Home Screen shortcut and add the website again from Safari.
+
 ## How to play
 
 1. Choose any of the three pieces. Drag it onto the board, or click/tap it and then choose its top-left target cell.

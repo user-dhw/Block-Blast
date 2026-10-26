@@ -72,3 +72,10 @@ The single-cell behavior above is historical. The current **Rescue** tool previe
 - A temporary terminal fixture had seven occupied cells per row and column, with diagonal gaps and a horizontal-domino tray. The game-over Rescue entry enabled piece selection. Confirming the first placement removed one blocker, cleared one row and one column for **252 points**, and restored ordinary legal placements. Escape cancelled confirmation before the keyboard Enter flow was used to stage and confirm it again. The fixture was removed before committing.
 - Mouse dragging a blocked piece only staged the preview; it did not spend a charge. Orange stripes marked only the blocked cells, and the preview stayed fixed while the confirmation controls were focused.
 - Portrait **375×667**, landscape **667×375** and compact desktop **1265×711** checks confirmed visible confirmation controls and no horizontal document overflow. The landscape obstacle/count hint remains visible. Physical-device touch testing remains outside these browser checks.
+
+## October 26, 2026: Home Screen icons
+
+- Added an opaque, full-bleed SVG master and matching PNG icons for iPhone (180), iPad (167/152), the web manifest (192/512) and browser tabs (32/16). Every PNG's dimensions and RGB/no-alpha format were checked.
+- The production build served under `/Block-Blast/` returned HTTP 200 with the expected image MIME types for every icon. The manifest resolved its launch URL and scope to `/Block-Blast/`, uses the name **Grid Burst** and requests standalone display.
+- ESLint and the production build passed. A real browser loaded the page, all 64 board buttons and the Apple icon/name metadata.
+- Actual iPhone installation, icon masking and standalone status-bar appearance require checking on the user's device. No offline/service-worker behavior is claimed.
