@@ -88,3 +88,10 @@ The single-cell behavior above is historical. The current **Rescue** tool previe
 - Separate fixture records of **321** for standard play and **9,999** for Free Play stayed in their respective modes when switching in both directions. The temporary local fixtures were removed before the production build.
 - Responsive browser checks at **375×667**, **667×375** and **1265×711** confirmed all mode tabs and gameplay controls fit, with no horizontal document overflow. Physical iPhone touch behavior remains untested.
 - ESLint, **151 tests across 6 files**, and a production build with `PAGES_BASE_PATH=/Block-Blast/` passed. Tests cover five-use exhaustion, free rescue, rotation, tray replacement, seeded continuation, save migration and separate best-score records.
+
+## October 27, 2026: Free Play naming and consistent board dimensions
+
+- The mode tab, board heading and help now use **Free Play** in English. The internal mode ID and save format remain compatible with existing runs.
+- Removed Free Play-specific board sizing. Classic and Free Play now share their responsive dimensions, and a stable scrollbar gutter prevents sideways movement when the extra tool row requires scrolling.
+- Browser comparisons at **375×667**, **390×844**, **667×375** and **1265×711** found identical board widths/heights, square cell dimensions, tray widths and horizontal positions before and after switching modes. No horizontal document overflow occurred.
+- At **375×667**, the board stayed **282×282** in both modes. Scrolling brought Rotate, New pieces, Rescue, New game and Help fully into view without resizing the board. These are browser viewport checks; physical iPhone behavior was not tested.

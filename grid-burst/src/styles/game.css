@@ -15,7 +15,7 @@
 }
 
 * { box-sizing: border-box; }
-html { min-width: 280px; min-height: 100%; background: #10151f; }
+html { min-width: 280px; min-height: 100%; background: #10151f; scrollbar-gutter: stable; }
 body { margin: 0; min-width: 280px; min-height: 100vh; min-height: 100dvh; }
 body::before {
   position: fixed;
@@ -453,7 +453,6 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
   .workspace { display: flex; flex: 0; flex-direction: column; align-items: center; max-width: none; padding: 5px 0 10px; gap: 0; }
   .intro-panel, .insight-panel { display: none; }
   .game-panel { width: var(--board-size); }
-  .freeplay-mode { --board-size: min(420px, calc(100vw - 56px), calc(100dvh - 412px)); }
   .freeplay-mode .freeplay-tools { margin-top: 8px; }
   .mobile-modes { display: flex; width: var(--board-size); gap: 9px; align-items: center; margin-bottom: 17px; }
   .mobile-modes .mode-switch { flex: 1; padding: 3px; border-radius: 10px; }
@@ -492,7 +491,6 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
 }
 @media (max-width: 760px) and (max-height: 740px) and (orientation: portrait) {
   :root { --board-size: min(calc(100vw - 40px), calc(100dvh - 385px)); --board-gap: 3px; --board-padding: 7px; --piece-cell-size: 17px; }
-  .freeplay-mode { --board-size: min(calc(100vw - 40px), calc(100dvh - 429px)); }
   .site-header { height: 57px; min-height: 57px; }
   .brand-name { font-size: 20px; }
   .brand-mark { width: 23px; height: 23px; }
@@ -515,7 +513,6 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
 }
 @media (max-width: 760px) and (orientation: landscape) and (max-height: 540px) {
   :root { --board-size: min(calc(100dvh - 70px), calc(57vw - 40px)); --board-gap: 3px; --board-padding: 6px; --piece-cell-size: 17px; }
-  .freeplay-mode { --board-size: min(calc(100dvh - 70px), calc(57vw - 40px)); }
   .app-shell { padding-inline: max(18px, env(safe-area-inset-left)) max(18px, env(safe-area-inset-right)); }
   .site-header { height: 49px; min-height: 49px; }
   .brand-mark { width: 22px; height: 22px; }

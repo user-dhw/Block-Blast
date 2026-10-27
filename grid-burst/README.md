@@ -17,12 +17,12 @@ See [`docs/verification.md`](docs/verification.md) for the executed checks and t
 ## Features
 
 - An immutable 8×8 engine with simultaneous row and column clearing, 46 validated shapes and seven glossy block colors.
-- Classic and seeded Random Challenge modes, with Casual, Normal and Hard difficulty, plus the unrestricted **为所欲为** Free Play mode.
+- Classic and seeded Random Challenge modes, with Casual, Normal and Hard difficulty, plus the unrestricted **Free Play** mode.
 - Pointer-based mouse, trackpad and touch dragging, legal/illegal previews, and predicted line highlights.
 - Click/tap selection and placement, plus keyboard placement controls.
 - Placement points, line bonuses, consecutive-clear combos, best scores, particles and optional synthesized audio.
 - Five Rescue hammer uses per Classic or Challenge run: preview and break the occupied cells blocking a selected piece, then place it in one confirmed move, including when no piece fits. Remaining uses survive a reload.
-- Unlimited automatic overlap clearing, free piece rotation and free fresh trays in **为所欲为**, with no game over and a separate **FUN BEST**.
+- Unlimited automatic overlap clearing, free piece rotation and free fresh trays in **Free Play**, with no game over and a separate **FUN BEST**.
 - Versioned, validated local saves that restore the board, remaining pieces and their rotations, score, combo, seed, RNG position, mode, difficulty and settings.
 - Responsive portrait/landscape layouts, visible keyboard focus and reduced-motion support.
 - Unit and randomized simulation tests, a strict production build and GitHub Pages workflows.
@@ -73,7 +73,7 @@ There is no gravity or timer. Classic and Challenge pieces keep their shown orie
 
 Classic begins empty. Random Challenge begins with clustered blocks produced by legal placements, occupying 13–22 of the 64 cells, approximately 20–35%. Every opening is checked against its tray so there is a legal first move. Click the seed chip to copy a replay link, or enter a seed or replay link in Settings and choose Replay seed. A plain seed uses the current mode and difficulty; a replay link carries both, including Free Play links with `mode=freeplay`. This starts the same opening again. Opening a link for the currently saved seed resumes that run so a browser refresh preserves progress. Future trays reproduce when the same placements and tray rerolls are made in the same order.
 
-### 为所欲为 · Free Play
+### Free Play
 
 This mode starts with an empty board and uses the easy, small-piece-favoring Casual generator. It never reaches game over, and difficulty controls are hidden while it is active.
 
@@ -81,6 +81,8 @@ This mode starts with an empty board and uses the easy, small-piece-favoring Cas
 - **Rotate freely.** **Rotate** turns the selected piece clockwise by 90°. If no piece is selected, it rotates the first available tray piece. Rotation is free and does not advance the turn.
 - **Get new pieces.** **New pieces** replaces the tray as often as you like, for free, while preserving the board, score and turn count.
 - **Keep your progress.** Rotations, the current tray after rerolls, the RNG position and the rest of the run are saved, so refreshing resumes the same state. Free Play keeps a separate **FUN BEST** and does not change Classic or Challenge personal bests.
+
+All modes share the same responsive board and tray dimensions. On short portrait screens, Free Play's extra tools remain accessible by scrolling instead of shrinking the board. A stable scrollbar gutter keeps the board horizontally aligned when switching modes.
 
 Placements still consume a tray piece and use the usual scoring, line-clearing and combo rules. Rotation and fresh-tray tools are exclusive to this mode.
 
