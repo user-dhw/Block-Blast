@@ -1,10 +1,12 @@
 import { isGameOver } from '../game/placement';
+import { rotateShapeCells } from '../game/rotation';
 import { SHAPES } from '../game/shapes';
 import { BOARD_SIZE, COLORS, PICKAXE_USES } from '../game/types';
-import type { Board, GameState, Piece, SavedGame, Settings } from '../game/types';
+import type { Board, GameMode, GameState, Piece, SavedGame, Settings } from '../game/types';
 
 export const STORAGE_KEY = 'grid-burst:v1:save';
 export const BEST_STORAGE_KEY = 'grid-burst:v1:best';
+export const FREEPLAY_BEST_STORAGE_KEY = 'grid-burst:v1:freeplay-best';
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -34,24 +36,31 @@ function readBoard(value: unknown): Board | null {
   return result;
 }
 
-function readPiece(value: unknown): Piece | null {
+function readPiece(value: unknown, allowRotation: boolean): Piece | null {
   if (!record(value) || typeof value.id !== 'string' || !value.id || value.id.length > 256
     || typeof value.shapeId !== 'string' || !color(value.color) || !Array.isArray(value.cells)) return null;
   const shape = SHAPES.find((item) => item.id === value.shapeId);
   if (!shape || value.cells.length !== shape.cells.length) return null;
+  const rotation = 'rotation' in value ? value.rotation : 0;
+  if (typeof rotation !== 'number' || !Number.isInteger(rotation) || rotation < 0 || rotation > 3
+    || (!allowRotation && rotation !== 0)) return null;
+  const expected = rotateShapeCells(shape.cells, rotation);
   const cells = new Set<string>();
   for (const cell of value.cells) {
     if (!record(cell) || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return null;
     cells.add(`${cell.x},${cell.y}`);
   }
-  if (cells.size !== shape.cells.length || !shape.cells.every((cell) => cells.has(`${cell.x},${cell.y}`))) return null;
-  return { id: value.id, shapeId: shape.id, cells: shape.cells.map((cell) => ({ ...cell })), color: value.color };
+  if (cells.size !== expected.length || !expected.every((cell) => cells.has(`${cell.x},${cell.y}`))) return null;
+  return {
+    id: value.id, shapeId: shape.id, cells: expected, color: value.color,
+    ...('rotation' in value ? { rotation: rotation as 0 | 1 | 2 | 3 } : {}),
+  };
 }
 
 /** Copy only the versioned schema; restored moves never replay transient effects. */
 export function validateSave(value: unknown): SavedGame | null {
   try {
-    if (!record(value) || value.version !== 1 || !record(value.game) || !record(value.settings)) return null;
+    if (!record(value) || (value.version !== 1 && value.version !== 2) || !record(value.game) || !record(value.settings)) return null;
     const source = value.game;
     const settings = value.settings;
     if (source.version !== 1 || typeof settings.sound !== 'boolean' || typeof settings.showWelcome !== 'boolean') return null;
@@ -62,24 +71,34 @@ export function validateSave(value: unknown): SavedGame | null {
     for (const item of source.tray) {
       if (item === null) tray.push(null);
       else {
-        const piece = readPiece(item);
+        const piece = readPiece(item, source.mode === 'freeplay');
         if (!piece || ids.has(piece.id)) return null;
         ids.add(piece.id);
         tray.push(piece);
       }
     }
     if (ids.size === 0) return null;
-    // Existing v1 saves predate tools; only an absent field receives the allowance.
-    const pickaxesLeft = 'pickaxesLeft' in source ? source.pickaxesLeft : PICKAXE_USES;
+    // Old three-use runs gain the two added charges once. Version 2 is written
+    // back on the next save, so reloading cannot repeatedly increase allowances.
+    let pickaxesLeft: unknown = source.pickaxesLeft;
+    if (value.version === 1) {
+      if (!('pickaxesLeft' in source)) pickaxesLeft = PICKAXE_USES;
+      else {
+        if (!counter(pickaxesLeft) || pickaxesLeft > 3) return null;
+        pickaxesLeft += 2;
+      }
+    }
     if (!counter(pickaxesLeft) || pickaxesLeft > PICKAXE_USES) return null;
     if (!counter(source.score) || !counter(source.best) || source.best < source.score
       || !counter(source.combo) || !counter(source.totalLines) || !counter(source.moves)
       || source.combo > source.moves || typeof source.seed !== 'string' || !source.seed || source.seed.length > 256
       || !counter(source.rngState) || source.rngState > 0xffffffff
-      || (source.mode !== 'classic' && source.mode !== 'challenge')
+      || (source.mode !== 'classic' && source.mode !== 'challenge' && source.mode !== 'freeplay')
       || (source.difficulty !== 'casual' && source.difficulty !== 'normal' && source.difficulty !== 'hard')
       || (source.status !== 'playing' && source.status !== 'over')) return null;
-    if ((source.status === 'over') !== isGameOver(board, tray)) return null;
+    if (source.mode === 'freeplay') {
+      if (source.difficulty !== 'casual' || source.status !== 'playing') return null;
+    } else if ((source.status === 'over') !== isGameOver(board, tray)) return null;
     const game: GameState = {
       version: 1, board, tray, score: source.score, best: source.best,
       combo: source.combo, totalLines: source.totalLines, moves: source.moves,
@@ -87,7 +106,7 @@ export function validateSave(value: unknown): SavedGame | null {
       seed: source.seed, rngState: source.rngState, mode: source.mode,
       difficulty: source.difficulty, status: source.status, lastMove: null,
     };
-    return { version: 1, game, settings: { sound: settings.sound, showWelcome: settings.showWelcome } };
+    return { version: 2, game, settings: { sound: settings.sound, showWelcome: settings.showWelcome } };
   } catch {
     return null;
   }
@@ -102,9 +121,13 @@ export function loadSave(): SavedGame | null {
   }
 }
 
-export function loadBest(): number {
+function bestStorageKey(mode: GameMode = 'classic'): string {
+  return mode === 'freeplay' ? FREEPLAY_BEST_STORAGE_KEY : BEST_STORAGE_KEY;
+}
+
+export function loadBest(mode: GameMode = 'classic'): number {
   try {
-    const raw = window.localStorage.getItem(BEST_STORAGE_KEY);
+    const raw = window.localStorage.getItem(bestStorageKey(mode));
     if (!raw) return 0;
     const value: unknown = JSON.parse(raw);
     return counter(value) ? value : 0;
@@ -113,10 +136,10 @@ export function loadBest(): number {
   }
 }
 
-export function saveBest(best: number): boolean {
+export function saveBest(best: number, mode: GameMode = 'classic'): boolean {
   if (!counter(best)) return false;
   try {
-    window.localStorage.setItem(BEST_STORAGE_KEY, JSON.stringify(Math.max(best, loadBest())));
+    window.localStorage.setItem(bestStorageKey(mode), JSON.stringify(Math.max(best, loadBest(mode))));
     return true;
   } catch {
     return false;
@@ -124,10 +147,10 @@ export function saveBest(best: number): boolean {
 }
 
 export function saveGame(game: GameState, settings: Settings): boolean {
-  const save = validateSave({ version: 1, game, settings });
+  const save = validateSave({ version: 2, game, settings });
   if (!save) return false;
   try {
-    saveBest(game.best);
+    saveBest(game.best, game.mode);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
     return true;
   } catch {
@@ -135,7 +158,7 @@ export function saveGame(game: GameState, settings: Settings): boolean {
   }
 }
 
-/** Reset only this run. The separate best-score record survives. */
+/** Reset only this run. Both separate best-score records survive. */
 export function clearSave(): boolean {
   try {
     window.localStorage.removeItem(STORAGE_KEY);

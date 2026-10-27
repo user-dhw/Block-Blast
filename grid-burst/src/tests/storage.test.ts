@@ -1,13 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { breakThrough, createGame, placePiece } from '../game/gameEngine';
 import { getValidPlacements } from '../game/placement';
+import { rotateShapeCells } from '../game/rotation';
+import { SHAPES } from '../game/shapes';
 import { PICKAXE_USES } from '../game/types';
-import type { BlockColor, Difficulty, GameMode, SavedGame } from '../game/types';
-import { BEST_STORAGE_KEY, clearSave, loadBest, loadSave, saveBest, saveGame, STORAGE_KEY, validateSave } from '../utils/storage';
+import type { BlockColor, Difficulty, GameMode, Piece, SavedGame } from '../game/types';
+import { BEST_STORAGE_KEY, clearSave, FREEPLAY_BEST_STORAGE_KEY, loadBest, loadSave, saveBest, saveGame, STORAGE_KEY, validateSave } from '../utils/storage';
 
 const settings = { sound: false, showWelcome: false };
 function fixture(): SavedGame {
-  return { version: 1, game: createGame({ seed: 'save-test', best: 500 }), settings: { ...settings } };
+  return { version: 2, game: createGame({ seed: 'save-test', best: 500 }), settings: { ...settings } };
+}
+
+function rotatedPiece(rotation: 0 | 1 | 2 | 3 = 1): Piece {
+  const shape = SHAPES.find((item) => item.id === 'l-4-n')!;
+  return { id: 'rotated-piece', shapeId: shape.id, color: shape.color,
+    cells: rotateShapeCells(shape.cells, rotation), rotation };
 }
 
 describe('versioned, validated local persistence', () => {
@@ -30,6 +38,7 @@ describe('versioned, validated local persistence', () => {
     expect(moved.lastMove).not.toBeNull();
     expect(saveGame(moved, { sound: true, showWelcome: false })).toBe(true);
     const loaded = loadSave()!;
+    expect(loaded.version).toBe(2);
     expect(loaded.game).toEqual({ ...moved, lastMove: null });
     expect(loaded.settings).toEqual({ sound: true, showWelcome: false });
     expect(loaded.game).not.toBe(moved);
@@ -55,7 +64,7 @@ describe('versioned, validated local persistence', () => {
     expect(validateSave(undefined)).toBeNull();
   });
 
-  it.each([0, 1, 2, PICKAXE_USES])('round-trips %s remaining pickaxe uses', (pickaxesLeft) => {
+  it.each([0, 1, 2, 3, 4, 5])('round-trips %s remaining rescue uses', (pickaxesLeft) => {
     const save = fixture();
     save.game.pickaxesLeft = pickaxesLeft;
     expect(saveGame(save.game, save.settings)).toBe(true);
@@ -88,13 +97,90 @@ describe('versioned, validated local persistence', () => {
     expect(loaded.settings).toEqual(legacy.settings);
     expect(loadBest()).toBe(1000);
     expect(saveGame(loaded.game, loaded.settings)).toBe(true);
+    expect(JSON.parse(values.get(STORAGE_KEY)!).version).toBe(2);
     expect(JSON.parse(values.get(STORAGE_KEY)!).game.pickaxesLeft).toBe(PICKAXE_USES);
     expect(loadBest()).toBe(1000);
   });
 
-  it.each([null, undefined, '3', -1, 4, 0.5, NaN, Infinity])('rejects an explicit invalid pickaxe allowance %s', (pickaxesLeft) => {
+  it.each([0, 1, 2, 3])('adds two charges once to a legacy three-use run with %s remaining', (remaining) => {
+    const save = fixture();
+    values.set(STORAGE_KEY, JSON.stringify({ ...save, version: 1,
+      game: { ...save.game, pickaxesLeft: remaining } }));
+    const migrated = loadSave()!;
+    expect(migrated.version).toBe(2);
+    expect(migrated.game.pickaxesLeft).toBe(remaining + 2);
+    expect(validateSave(migrated)).toEqual(migrated);
+    expect(saveGame(migrated.game, migrated.settings)).toBe(true);
+    expect(JSON.parse(values.get(STORAGE_KEY)!).version).toBe(2);
+    expect(loadSave()?.game.pickaxesLeft).toBe(remaining + 2);
+    const afterUse = { ...migrated.game, pickaxesLeft: remaining + 1 };
+    expect(saveGame(afterUse, migrated.settings)).toBe(true);
+    expect(loadSave()?.game.pickaxesLeft).toBe(remaining + 1);
+  });
+
+  it.each([null, undefined, '3', -1, 4, 5, 0.5, NaN, Infinity])('rejects invalid legacy allowance %s', (pickaxesLeft) => {
+    const save = fixture();
+    expect(validateSave({ ...save, version: 1, game: { ...save.game, pickaxesLeft } })).toBeNull();
+  });
+
+  it.each([null, undefined, '5', -1, 6, 0.5, NaN, Infinity])('rejects an explicit invalid v2 rescue allowance %s', (pickaxesLeft) => {
     const save = fixture();
     expect(validateSave({ ...save, game: { ...save.game, pickaxesLeft } })).toBeNull();
+  });
+
+  it('requires a rescue allowance in the new save version', () => {
+    const save = fixture();
+    const partial: Partial<SavedGame['game']> = { ...save.game };
+    delete partial.pickaxesLeft;
+    expect(validateSave({ ...save, game: partial })).toBeNull();
+  });
+
+  it.each([0, 1, 2, 3] as const)('round-trips freeplay piece rotation %s', (rotation) => {
+    const game = createGame({ seed: 'rotated-save', mode: 'freeplay', best: 120 });
+    game.tray[0] = rotatedPiece(rotation);
+    expect(saveGame(game, settings)).toBe(true);
+    expect(loadSave()?.game).toEqual(game);
+    expect(loadSave()?.game.tray[0]?.rotation).toBe(rotation);
+  });
+
+  it('retains optional unrotated payloads without introducing rotation fields', () => {
+    const save = fixture();
+    expect(save.game.tray.some((piece) => piece && 'rotation' in piece)).toBe(false);
+    expect(validateSave(save)).toEqual(save);
+  });
+
+  it.each(['classic', 'challenge'] as const)('rejects rotated pieces in %s, including symmetric rotations', (mode) => {
+    const game = createGame({ seed: 'standard-rules', mode });
+    game.tray[0] = rotatedPiece();
+    expect(validateSave({ version: 2, game, settings })).toBeNull();
+    const single = SHAPES.find((shape) => shape.id === 'single')!;
+    game.tray[0] = { id: 'symmetric', shapeId: single.id, cells: single.cells, color: single.color, rotation: 2 };
+    expect(validateSave({ version: 2, game, settings })).toBeNull();
+  });
+
+  it.each([null, undefined, '1', -1, 4, 0.5, NaN, Infinity])('rejects malformed rotation %s', (rotation) => {
+    const game = createGame({ seed: 'bad-rotation', mode: 'freeplay' });
+    game.tray[0] = rotatedPiece();
+    expect(validateSave({ version: 2, game: { ...game,
+      tray: [{ ...game.tray[0], rotation }, ...game.tray.slice(1)] }, settings })).toBeNull();
+  });
+
+  it('rejects rotated cells that do not match their declared orientation', () => {
+    const game = createGame({ seed: 'wrong-orientation', mode: 'freeplay' });
+    const piece = rotatedPiece(1);
+    game.tray[0] = { ...piece, rotation: 2 };
+    expect(validateSave({ version: 2, game, settings })).toBeNull();
+    game.tray[0] = { ...piece, cells: piece.cells.map((cell) => ({ x: cell.x + 1, y: cell.y })) };
+    expect(validateSave({ version: 2, game, settings })).toBeNull();
+  });
+
+  it('keeps blocked freeplay saves playing and requires casual difficulty', () => {
+    const game = createGame({ seed: 'blocked-freeplay', mode: 'freeplay' });
+    game.board = game.board.map((row) => row.map(() => ({ color: 'blue' as const })));
+    expect(saveGame(game, settings)).toBe(true);
+    expect(loadSave()?.game).toEqual(game);
+    expect(validateSave({ version: 2, game: { ...game, status: 'over' }, settings })).toBeNull();
+    expect(validateSave({ version: 2, game: { ...game, difficulty: 'normal' }, settings })).toBeNull();
   });
 
   it('retains terminal saves even when pickaxe charges remain', () => {
@@ -107,7 +193,7 @@ describe('versioned, validated local persistence', () => {
   });
 
   const invalidCases: [string, (save: SavedGame) => void][] = [
-    ['wrong save version', (save) => { (save as { version: number }).version = 2; }],
+    ['wrong save version', (save) => { (save as { version: number }).version = 3; }],
     ['wrong game version', (save) => { (save.game as { version: number }).version = 2; }],
     ['wrong board height', (save) => { save.game.board.pop(); }],
     ['wrong board width', (save) => { save.game.board[0].pop(); }],
@@ -164,6 +250,28 @@ describe('versioned, validated local persistence', () => {
     expect(saveBest(-1)).toBe(false);
     values.set(BEST_STORAGE_KEY, 'garbage');
     expect(loadBest()).toBe(0);
+  });
+
+  it('separates freeplay bests from the shared classic and challenge record', () => {
+    expect(saveBest(900, 'classic')).toBe(true);
+    expect(loadBest('challenge')).toBe(900);
+    expect(loadBest('freeplay')).toBe(0);
+    expect(saveBest(1400, 'freeplay')).toBe(true);
+    expect(loadBest()).toBe(900);
+    expect(loadBest('freeplay')).toBe(1400);
+    expect(saveBest(1200, 'freeplay')).toBe(true);
+    expect(loadBest('freeplay')).toBe(1400);
+    expect(saveGame(createGame({ seed: 'fun-best', mode: 'freeplay', best: 1700 }), settings)).toBe(true);
+    expect(loadBest()).toBe(900);
+    expect(loadBest('freeplay')).toBe(1700);
+    expect(saveGame(createGame({ seed: 'standard-best', mode: 'challenge', best: 1000 }), settings)).toBe(true);
+    expect(loadBest()).toBe(1000);
+    expect(loadBest('freeplay')).toBe(1700);
+    expect(clearSave()).toBe(true);
+    expect(values.has(BEST_STORAGE_KEY)).toBe(true);
+    expect(values.has(FREEPLAY_BEST_STORAGE_KEY)).toBe(true);
+    expect(loadBest('classic')).toBe(1000);
+    expect(loadBest('freeplay')).toBe(1700);
   });
 
   it('gracefully handles disabled browser storage and unavailable browser APIs', () => {

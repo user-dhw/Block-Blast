@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { breakThrough, createGame, placePiece, restartGame } from '../game/gameEngine';
+import { breakThrough, createGame, placePiece, rerollTray, restartGame, rotatePiece } from '../game/gameEngine';
 import type { GameOptions, GameState, Settings } from '../game/types';
 import { loadBest, loadSave, saveGame } from '../utils/storage';
 
@@ -7,11 +7,15 @@ function initialState() {
   const saved = loadSave();
   const params = new URLSearchParams(window.location.search);
   const seed = params.get('seed')?.trim().slice(0, 128);
-  const mode = params.get('mode') === 'classic' ? 'classic' : 'challenge';
+  const modeParam = params.get('mode');
+  const mode = modeParam === 'classic' || modeParam === 'freeplay' ? modeParam : 'challenge';
   const difficultyParam = params.get('difficulty');
-  const difficulty = difficultyParam === 'casual' || difficultyParam === 'hard' ? difficultyParam : 'normal';
+  const difficulty = mode === 'freeplay' ? 'casual' : difficultyParam === 'casual' || difficultyParam === 'hard' ? difficultyParam : 'normal';
   const useSaved = saved && (!seed || (saved.game.seed === seed && saved.game.mode === mode && saved.game.difficulty === difficulty));
-  const game = useSaved ? { ...saved.game, best: Math.max(saved.game.best, loadBest()) } : createGame({ best: Math.max(saved?.game.best ?? 0, loadBest()), ...(seed ? { seed, mode, difficulty } : {}) });
+  const targetMode = seed ? mode : saved?.game.mode ?? 'classic';
+  const sharesBest = (saved?.game.mode === 'freeplay') === (targetMode === 'freeplay');
+  const best = Math.max(sharesBest ? saved?.game.best ?? 0 : 0, loadBest(targetMode));
+  const game = useSaved ? { ...saved.game, best: Math.max(saved.game.best, best) } : createGame({ best, ...(seed ? { seed, mode, difficulty } : {}) });
   return { game, settings: saved?.settings ?? { sound: false, showWelcome: false } };
 }
 
@@ -32,7 +36,8 @@ export function useGame() {
   }, []);
 
   const restart = useCallback((options: GameOptions = {}) => {
-    const next = restartGame(stateRef.current, options);
+    const targetMode = options.mode ?? stateRef.current.mode;
+    const next = restartGame(stateRef.current, { ...options, best: Math.max(options.best ?? 0, loadBest(targetMode)) });
     stateRef.current = next;
     setGame(next);
   }, []);
@@ -43,5 +48,17 @@ export function useGame() {
     return next;
   }, []);
 
-  return { game, settings, setSettings, place, rescue, restart, storageAvailable };
+  const rotate = useCallback((pieceId: string) => {
+    const next = rotatePiece(stateRef.current, pieceId);
+    if (next) { stateRef.current = next; setGame(next); }
+    return next;
+  }, []);
+
+  const shuffle = useCallback(() => {
+    const next = rerollTray(stateRef.current);
+    if (next) { stateRef.current = next; setGame(next); }
+    return next;
+  }, []);
+
+  return { game, settings, setSettings, place, rescue, rotate, shuffle, restart, storageAvailable };
 }

@@ -170,6 +170,15 @@ button, a { touch-action: manipulation; }
 .mode-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .mode-switch button svg { width: 12px; height: 12px; }
 .mode-switch button.active { color: #eaf1fa; background: #303948; border-color: #ffffff08; box-shadow: 0 2px 6px #0003; }
+.mode-switch button { min-width: 0; padding-inline: 6px; font-size: 10px; }
+.mode-switch button svg { display: none; }
+.mode-switch .freeplay-tab.active { color: #dbfbff; background: linear-gradient(135deg, #24535a, #3e4264); border-color: #77d4d744; }
+.freeplay-mode .live-label { color: #8edcdb; letter-spacing: 1px; }
+.freeplay-mode .status-dot { background: #8edcdb; }
+.freeplay-mode .rescue-count { color: #c6f8fa; background: #71cdd817; }
+.freeplay-tools { display: flex; gap: 8px; margin-top: 11px; }
+.freeplay-tools > button { flex: 1; min-width: 0; min-height: 36px; padding: 8px 10px; color: #b6e9eb; font-size: 10px; border-color: #8edcdb24; background: #1b303c; }
+.freeplay-tools > button:hover { color: #e1feff; background: #254653; }
 .difficulty-select { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; color: #8a93a4; font-size: 11px; }
 .difficulty-select label { font-size: 11px; }
 .difficulty-select select { max-width: 130px; padding: 7px 24px 7px 10px; color: #d5dce7; background: #1a212d; border: 1px solid #ffffff0d; border-radius: 7px; font-size: 11px; cursor: pointer; }
@@ -444,9 +453,12 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
   .workspace { display: flex; flex: 0; flex-direction: column; align-items: center; max-width: none; padding: 5px 0 10px; gap: 0; }
   .intro-panel, .insight-panel { display: none; }
   .game-panel { width: var(--board-size); }
+  .freeplay-mode { --board-size: min(420px, calc(100vw - 56px), calc(100dvh - 412px)); }
+  .freeplay-mode .freeplay-tools { margin-top: 8px; }
   .mobile-modes { display: flex; width: var(--board-size); gap: 9px; align-items: center; margin-bottom: 17px; }
   .mobile-modes .mode-switch { flex: 1; padding: 3px; border-radius: 10px; }
   .mobile-modes .mode-switch button { min-height: 31px; font-size: 10px; padding: 5px 9px; border-radius: 7px; }
+  .mobile-modes .mode-switch button { padding-inline: 5px; }
   .mobile-modes select { width: 88px; min-height: 38px; padding: 7px 6px; border: 1px solid #ffffff0c; border-radius: 9px; color: #a6b2c5; background: #192231; font-size: 10px; }
   .game-topbar { margin-bottom: 10px; }
   .live-label { font-size: 8px; letter-spacing: 1.3px; }
@@ -480,6 +492,7 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
 }
 @media (max-width: 760px) and (max-height: 740px) and (orientation: portrait) {
   :root { --board-size: min(calc(100vw - 40px), calc(100dvh - 385px)); --board-gap: 3px; --board-padding: 7px; --piece-cell-size: 17px; }
+  .freeplay-mode { --board-size: min(calc(100vw - 40px), calc(100dvh - 429px)); }
   .site-header { height: 57px; min-height: 57px; }
   .brand-name { font-size: 20px; }
   .brand-mark { width: 23px; height: 23px; }
@@ -502,6 +515,7 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
 }
 @media (max-width: 760px) and (orientation: landscape) and (max-height: 540px) {
   :root { --board-size: min(calc(100dvh - 70px), calc(57vw - 40px)); --board-gap: 3px; --board-padding: 6px; --piece-cell-size: 17px; }
+  .freeplay-mode { --board-size: min(calc(100dvh - 70px), calc(57vw - 40px)); }
   .app-shell { padding-inline: max(18px, env(safe-area-inset-left)) max(18px, env(safe-area-inset-right)); }
   .site-header { height: 49px; min-height: 49px; }
   .brand-mark { width: 22px; height: 22px; }
@@ -509,6 +523,10 @@ button.footer-link { display: inline-flex; align-items: center; gap: 8px; paddin
   .header-actions .icon-button { width: 30px; height: 30px; padding: 7px; }
   .workspace { padding-block: 5px; align-items: stretch; }
   .game-panel { display: grid; width: 100%; grid-template-columns: var(--board-size) minmax(200px, 1fr); grid-template-rows: auto auto auto 1fr auto; column-gap: 24px; }
+  .freeplay-mode .game-panel { grid-template-rows: auto auto auto 1fr auto auto; }
+  .freeplay-tools { grid-column: 2; grid-row: 5; margin-top: 6px; }
+  .freeplay-mode .game-controls { grid-row: 6; padding-top: 0; margin-top: 6px; }
+  .freeplay-mode .board-wrap { grid-row: 1 / 7; }
   .mobile-modes { grid-column: 2; grid-row: 1; width: 100%; margin: 0 0 8px; }
   .game-topbar { display: none; }
   .score-panel { grid-column: 2; grid-row: 2; margin: 0 0 8px; }

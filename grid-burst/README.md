@@ -17,12 +17,13 @@ See [`docs/verification.md`](docs/verification.md) for the executed checks and t
 ## Features
 
 - An immutable 8×8 engine with simultaneous row and column clearing, 46 validated shapes and seven glossy block colors.
-- Classic and seeded Random Challenge modes, with Casual, Normal and Hard difficulty.
+- Classic and seeded Random Challenge modes, with Casual, Normal and Hard difficulty, plus the unrestricted **为所欲为** Free Play mode.
 - Pointer-based mouse, trackpad and touch dragging, legal/illegal previews, and predicted line highlights.
 - Click/tap selection and placement, plus keyboard placement controls.
 - Placement points, line bonuses, consecutive-clear combos, best scores, particles and optional synthesized audio.
-- Three Rescue hammer uses per run: preview and break the occupied cells blocking a selected piece, then place it in one confirmed move, including when no piece fits. Remaining uses survive a reload.
-- Versioned, validated local saves that restore the board, remaining pieces, score, combo, seed, RNG position, mode, difficulty and settings.
+- Five Rescue hammer uses per Classic or Challenge run: preview and break the occupied cells blocking a selected piece, then place it in one confirmed move, including when no piece fits. Remaining uses survive a reload.
+- Unlimited automatic overlap clearing, free piece rotation and free fresh trays in **为所欲为**, with no game over and a separate **FUN BEST**.
+- Versioned, validated local saves that restore the board, remaining pieces and their rotations, score, combo, seed, RNG position, mode, difficulty and settings.
 - Responsive portrait/landscape layouts, visible keyboard focus and reduced-motion support.
 - Unit and randomized simulation tests, a strict production build and GitHub Pages workflows.
 
@@ -57,18 +58,31 @@ The website includes dedicated Home Screen icons and standalone launch metadata.
 
 ## How to play
 
+Classic and Random Challenge follow these rules:
+
 1. Choose any of the three pieces. Drag it onto the board, or click/tap it and then choose its top-left target cell.
 2. For ordinary placements, every square of a piece must land inside the board on an empty cell. Pieces keep their shown orientation.
 3. Fill a complete row or column to clear it. All completed lines clear together, and their intersection cells clear only once.
 4. Use all three pieces before receiving the next tray. An empty tray slot stays empty until then.
 5. Keep placing pieces for as long as any remaining piece fits. One unusable piece does not end the game if another one still fits.
-6. Choose **Rescue**, then select a tray piece and tap or drop it at a target position. The preview marks only the occupied cells within that piece's exact footprint. Choose **Break & place** to remove those blocking cells and place the selected piece in one move. Each blocked placement costs one of the run's three uses, regardless of how many blocking cells it removes. The end-of-run dialog also offers Rescue so you can select a piece when no ordinary move fits.
+6. Choose **Rescue**, then select a tray piece and tap or drop it at a target position. The preview marks only the occupied cells within that piece's exact footprint. Choose **Break & place** to remove those blocking cells and place the selected piece in one move. Each blocked placement costs one of the run's five uses, regardless of how many blocking cells it removes. The end-of-run dialog also offers Rescue so you can select a piece when no ordinary move fits.
 
-Cancelling a pending Rescue placement costs nothing, and a legal target with no blocking cells places normally without spending a use. A piece must fit entirely inside the board; out-of-bounds targets cannot be confirmed. A confirmed Rescue placement spends its tray piece, advances the turn and applies the usual placement points, line clears and combo rules. Destroying blocking cells awards no extra points. The tray refills after its last piece is placed, as with ordinary moves. A new run restores all three uses; refreshing keeps the remaining allowance.
+Cancelling a pending Rescue placement costs nothing, and a legal target with no blocking cells places normally without spending a use. A piece must fit entirely inside the board; out-of-bounds targets cannot be confirmed. A confirmed Rescue placement spends its tray piece, advances the turn and applies the usual placement points, line clears and combo rules. Destroying blocking cells awards no extra points. The tray refills after its last piece is placed, as with ordinary moves. A new Classic or Challenge run restores all five uses; refreshing keeps the remaining allowance.
 
-There is no gravity, timer or player-controlled rotation. A move that does not clear a line resets the consecutive-clear combo. Invalid drops leave the run unchanged. During touch dragging, the piece lifts above the finger to expose its target.
+There is no gravity or timer. Classic and Challenge pieces keep their shown orientation; player-controlled rotation is available only in Free Play. A move that does not clear a line resets the consecutive-clear combo. Invalid out-of-bounds drops leave the run unchanged. During touch dragging, the piece lifts above the finger to expose its target.
 
-Classic begins empty. Random Challenge begins with clustered blocks produced by legal placements, occupying 13–22 of the 64 cells, approximately 20–35%. Every opening is checked against its tray so there is a legal first move. Click the seed chip to copy a replay link, or enter a seed or replay link in Settings and choose Replay seed. A plain seed uses the current mode and difficulty; a replay link carries both. This starts the same opening again. Opening a link for the currently saved seed resumes that run so a browser refresh preserves progress. Future trays also reproduce when the same moves are made in the same order.
+Classic begins empty. Random Challenge begins with clustered blocks produced by legal placements, occupying 13–22 of the 64 cells, approximately 20–35%. Every opening is checked against its tray so there is a legal first move. Click the seed chip to copy a replay link, or enter a seed or replay link in Settings and choose Replay seed. A plain seed uses the current mode and difficulty; a replay link carries both, including Free Play links with `mode=freeplay`. This starts the same opening again. Opening a link for the currently saved seed resumes that run so a browser refresh preserves progress. Future trays reproduce when the same placements and tray rerolls are made in the same order.
+
+### 为所欲为 · Free Play
+
+This mode starts with an empty board and uses the easy, small-piece-favoring Casual generator. It never reaches game over, and difficulty controls are hidden while it is active.
+
+- **Place anywhere inside the board.** Drag or tap a piece directly over existing blocks to remove only its occupied footprint's blockers and place it immediately. Automatic Rescue is unlimited, shown as **∞**, and needs no confirmation. You can still choose **Rescue** manually for an optional blocker preview and **Break & place** confirmation.
+- **Rotate freely.** **Rotate** turns the selected piece clockwise by 90°. If no piece is selected, it rotates the first available tray piece. Rotation is free and does not advance the turn.
+- **Get new pieces.** **New pieces** replaces the tray as often as you like, for free, while preserving the board, score and turn count.
+- **Keep your progress.** Rotations, the current tray after rerolls, the RNG position and the rest of the run are saved, so refreshing resumes the same state. Free Play keeps a separate **FUN BEST** and does not change Classic or Challenge personal bests.
+
+Placements still consume a tray piece and use the usual scoring, line-clearing and combo rules. Rotation and fresh-tray tools are exclusive to this mode.
 
 ## Scoring
 
@@ -100,7 +114,7 @@ These weights gently ease all three difficulties: small shapes receive 20% more 
 
 For Casual and Normal, [`solver.ts`](src/game/solver.ts) searches piece orders and legal positions while simulating line clearing after every placement. It memoizes board/tray states and limits each candidate to 1,800 search nodes. Generation tries up to eight candidates. A search that runs out of budget is rejected conservatively even if an undiscovered solution may exist.
 
-After retry exhaustion, the generator offers three single-cell pieces. A reachable non-terminal board has room for these as lines clear. An externally supplied terminal board is handled as game over; the generator never deletes occupied cells or changes scores to make a tray fit. Hard openings still receive an additional legal-move check. The generator does not force losses or alter scores based on difficulty.
+After retry exhaustion, the generator offers three single-cell pieces. A reachable non-terminal board has room for these as lines clear. In Classic and Challenge, an externally supplied terminal board is handled as game over; the generator never deletes occupied cells or changes scores to make a tray fit. Free Play always remains active because overlapping placements can clear their blockers. Hard openings still receive an additional legal-move check. The generator does not force losses or alter scores based on difficulty.
 
 ## Architecture
 
@@ -114,6 +128,7 @@ grid-burst/
 │   ├── game/
 │   │   ├── types.ts
 │   │   ├── shapes.ts
+│   │   ├── rotation.ts
 │   │   ├── random.ts
 │   │   ├── placement.ts
 │   │   ├── clearing.ts
@@ -134,9 +149,11 @@ grid-burst/
 └── vite.config.ts
 ```
 
-Game rules remain in pure TypeScript. Ordinary placements and confirmed Rescue placements commit a single atomic transition and return no change for invalid, duplicate or stale placements. A Rescue preview does not change the board or spend an allowance; confirmation removes only the occupied cells in the selected piece's footprint before applying normal placement and line clearing. Transient visual effects do not mutate the board or replay after a reload. Pointer coordinates are calculated from the current board rectangle, padding and gaps rather than fixed screen positions.
+Game rules remain in pure TypeScript. Ordinary placements, confirmed Rescue placements and Free Play's automatic overlap placements commit a single atomic transition and return no change for invalid, duplicate or stale placements. A Rescue preview does not change the board or spend an allowance. Rescue removes only the occupied cells in the selected piece's footprint before applying normal placement and line clearing. Transient visual effects do not mutate the board or replay after a reload. Pointer coordinates are calculated from the current board rectangle, padding and gaps rather than fixed screen positions.
 
-Saves use `grid-burst:v1:save`; the separate `grid-burst:v1:best` record preserves best scores across run resets. Storage parsing verifies dimensions, colors, shape membership, piece identities, numeric values, the remaining Rescue allowance (0–3) and game-over consistency. Older v1 saves without a tool allowance receive three uses while keeping their run. Existing saved allowances are retained. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing the best score.
+Saves continue to use `grid-burst:v1:save`, with a version 2 save wrapper. Existing version 1 runs migrate without losing their board, tray, score, settings or best: an old three-use allowance gains two remaining charges once, while older saves without an allowance receive five. Saving the migrated run as version 2 prevents repeated grants. Version 2 validates the remaining standard-mode allowance from 0 to 5, rotated shape membership and mode rules. Nonzero piece rotations are accepted only for Free Play, which must use Casual difficulty and remain active even when no ordinary piece fits.
+
+The separate `grid-burst:v1:best` record preserves the shared Classic/Challenge personal best across run resets; `grid-burst:v1:freeplay-best` preserves **FUN BEST** independently. Missing, malformed and incompatible data starts a fresh game. Unavailable storage does not prevent playing, but progress cannot survive a reload. The settings controls allow resetting saved progress without erasing either best-score record.
 
 ## Tests and verification
 
@@ -205,4 +222,4 @@ The app targets current Safari on iOS/macOS, Chrome on Android/desktop, Firefox 
 
 Physical iPhone/Android touch and haptics have not been verified on actual hardware in this workspace. Browser-emulated pointer checks do not replace that testing. Old browsers without modern CSS/Pointer Events support are outside the target. Storage belongs to the current browser and origin; it is not cloud sync and is removed if the player clears website data. Hard mode intentionally does not guarantee that an entire newly generated tray has a valid sequence. The bounded Normal/Casual solver may use the safe fallback more often on a nearly full board.
 
-There is no leaderboard, account system, undo or piece rotation. Seeds reproduce this version of the game's rules; changing shape weights or generator logic may change a seed's future results.
+There is no leaderboard, account system or undo. Classic and Challenge have fixed piece orientations; Free Play permits rotation and unlimited fresh trays. Seeds reproduce this version of the game's rules; changing shape weights or generator logic may change a seed's future results.

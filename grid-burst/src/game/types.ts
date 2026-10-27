@@ -1,14 +1,15 @@
 export const BOARD_SIZE = 8;
-export const PICKAXE_USES = 3;
+export const PICKAXE_USES = 5;
 export const COLORS = ['blue', 'cyan', 'orange', 'yellow', 'purple', 'green', 'red'] as const;
 export type BlockColor = (typeof COLORS)[number];
 export type CellOffset = { x: number; y: number };
 export type Cell = { color: BlockColor };
 export type Board = (Cell | null)[][];
 export type BlockShape = { id: string; cells: CellOffset[]; weight: number; color: BlockColor };
-export type Piece = { id: string; shapeId: string; cells: CellOffset[]; color: BlockColor };
+export type PieceRotation = 0 | 1 | 2 | 3;
+export type Piece = { id: string; shapeId: string; cells: CellOffset[]; color: BlockColor; rotation?: PieceRotation };
 export type Difficulty = 'casual' | 'normal' | 'hard';
-export type GameMode = 'classic' | 'challenge';
+export type GameMode = 'classic' | 'challenge' | 'freeplay';
 export type ClearResult = {
   board: Board;
   clearedRows: number[];
@@ -45,4 +46,4 @@ export type GameState = {
 };
 export type GameOptions = { seed?: string; mode?: GameMode; difficulty?: Difficulty; best?: number };
 export type Settings = { sound: boolean; showWelcome: boolean };
-export type SavedGame = { version: 1; game: GameState; settings: Settings };
+export type SavedGame = { version: 2; game: GameState; settings: Settings };

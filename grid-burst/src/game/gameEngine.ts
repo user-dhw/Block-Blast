@@ -3,9 +3,10 @@ import { generatePieceTray } from './generator';
 import { createInitialBoard } from './initialBoard';
 import { canPlacePiece, createEmptyBoard, getPlacementObstacles, isGameOver, putPiece } from './placement';
 import { createRng, createSeed, seedToState } from './random';
+import { rotateShapeCells } from './rotation';
 import { calculateScore } from './scoring';
 import { PICKAXE_USES } from './types';
-import type { GameOptions, GameState } from './types';
+import type { GameOptions, GameState, PieceRotation } from './types';
 
 export { createEmptyBoard } from './placement';
 
@@ -13,7 +14,7 @@ export function createGame(options: GameOptions = {}): GameState {
   const seed = options.seed ?? createSeed();
   const rng = createRng(seedToState(seed));
   const mode = options.mode ?? 'classic';
-  const difficulty = options.difficulty ?? 'normal';
+  const difficulty = mode === 'freeplay' ? 'casual' : options.difficulty ?? 'normal';
   const board = mode === 'challenge' ? createInitialBoard(rng) : createEmptyBoard();
   let tray = generatePieceTray(board, rng, difficulty, 'tray-0');
   // Challenges always open with a playable tray, including on Hard.
@@ -32,14 +33,14 @@ export function createGame(options: GameOptions = {}): GameState {
     rngState: rng.state,
     mode,
     difficulty,
-    status: isGameOver(board, tray) ? 'over' : 'playing',
+    status: mode !== 'freeplay' && isGameOver(board, tray) ? 'over' : 'playing',
     lastMove: null,
   };
 }
 
 /** Atomic immutable transition: invalid/double/stale placements leave the run unchanged. */
 export function placePiece(state: GameState, pieceId: string, x: number, y: number): GameState | null {
-  if (state.status !== 'playing') return null;
+  if (state.mode !== 'freeplay' && state.status !== 'playing') return null;
   const index = state.tray.findIndex((piece) => piece?.id === pieceId);
   const piece = state.tray[index];
   if (!piece || !canPlacePiece(state.board, piece, x, y)) return null;
@@ -49,7 +50,7 @@ export function placePiece(state: GameState, pieceId: string, x: number, y: numb
   let rngState = state.rngState;
   if (tray.every((available) => available === null)) {
     const rng = createRng(rngState);
-    tray = generatePieceTray(cleared.board, rng, state.difficulty, `tray-${state.moves + 1}`);
+    tray = generatePieceTray(cleared.board, rng, state.mode === 'freeplay' ? 'casual' : state.difficulty, `tray-${state.moves + 1}`);
     rngState = rng.state;
   }
   const points = state.score + score.points;
@@ -63,7 +64,7 @@ export function placePiece(state: GameState, pieceId: string, x: number, y: numb
     totalLines: state.totalLines + cleared.clearedLineCount,
     moves: state.moves + 1,
     rngState,
-    status: isGameOver(cleared.board, tray) ? 'over' : 'playing',
+    status: state.mode !== 'freeplay' && isGameOver(cleared.board, tray) ? 'over' : 'playing',
     lastMove: {
       placed: piece.cells.map((cell) => ({ x: x + cell.x, y: y + cell.y })),
       clearedPositions: cleared.clearedPositions,
@@ -77,14 +78,15 @@ export function placePiece(state: GameState, pieceId: string, x: number, y: numb
 
 /** Clear a blocked footprint, then commit the selected piece through the normal turn. */
 export function breakThrough(state: GameState, pieceId: string, x: number, y: number): GameState | null {
-  if (!(state.pickaxesLeft > 0)) return null;
+  if (state.mode !== 'freeplay' && !(state.pickaxesLeft > 0)) return null;
   const piece = state.tray.find((item) => item?.id === pieceId);
   if (!piece) return null;
   const removedPositions = getPlacementObstacles(state.board, piece, x, y);
   if (!removedPositions || removedPositions.length === 0) return null;
   const board = state.board.map((row) => row.map((item) => item ? { ...item } : null));
   for (const cell of removedPositions) board[cell.y][cell.x] = null;
-  const next = placePiece({ ...state, board, status: 'playing', pickaxesLeft: state.pickaxesLeft - 1 }, pieceId, x, y);
+  const next = placePiece({ ...state, board, status: 'playing',
+    pickaxesLeft: state.mode === 'freeplay' ? PICKAXE_USES : state.pickaxesLeft - 1 }, pieceId, x, y);
   if (!next || !next.lastMove) return null;
   return {
     ...next,
@@ -92,11 +94,35 @@ export function breakThrough(state: GameState, pieceId: string, x: number, y: nu
   };
 }
 
+/** Freeplay rotation changes only the selected tray piece; a turn is not spent. */
+export function rotatePiece(state: GameState, pieceId: string): GameState | null {
+  if (state.mode !== 'freeplay') return null;
+  const index = state.tray.findIndex((piece) => piece?.id === pieceId);
+  const piece = state.tray[index];
+  if (!piece) return null;
+  const cells = rotateShapeCells(piece.cells, 1);
+  if (cells.length === 0) return null;
+  const tray = state.tray.map((available, slot) => slot === index ? {
+    ...piece, cells, rotation: ((piece.rotation ?? 0) + 1) % 4 as PieceRotation,
+  } : available);
+  return { ...state, tray, status: 'playing', lastMove: null };
+}
+
+/** Freeplay can replace its tray without changing the board or any scoring counters. */
+export function rerollTray(state: GameState): GameState | null {
+  if (state.mode !== 'freeplay') return null;
+  const rng = createRng(state.rngState);
+  const tray = generatePieceTray(state.board, rng, 'casual', `reroll-${rng.state.toString(36)}`);
+  return { ...state, tray, rngState: rng.state, status: 'playing', lastMove: null };
+}
+
 export function restartGame(state: GameState, options: GameOptions = {}): GameState {
+  const mode = options.mode ?? state.mode;
+  const sameScoreGroup = (mode === 'freeplay') === (state.mode === 'freeplay');
   return createGame({
-    mode: state.mode,
+    mode,
     difficulty: state.difficulty,
     ...options,
-    best: Math.max(state.best, state.score, options.best ?? 0),
+    best: sameScoreGroup ? Math.max(state.best, state.score, options.best ?? 0) : options.best ?? 0,
   });
 }

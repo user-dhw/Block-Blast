@@ -60,8 +60,8 @@ describe('placement footprint obstacles', () => {
 });
 
 describe('breakthrough hammer turns', () => {
-  it('starts every new run with three uses', () => {
-    expect(PICKAXE_USES).toBe(3);
+  it('starts every new run with five uses', () => {
+    expect(PICKAXE_USES).toBe(5);
     for (const mode of ['classic', 'challenge'] as const) {
       expect(createGame({ seed: 'fresh-tools', mode }).pickaxesLeft).toBe(PICKAXE_USES);
     }
@@ -84,7 +84,7 @@ describe('breakthrough hammer turns', () => {
       removedPositions: [{ x: 0, y: 0 }], clearedPositions: [],
       points: 3, lines: 0, combo: 0, color: 'cyan',
     });
-    expect(next.pickaxesLeft).toBe(2);
+    expect(next.pickaxesLeft).toBe(PICKAXE_USES - 1);
     expect(next.moves).toBe(game.moves + 1);
     expect(next.score).toBe(game.score + 3);
     expect(next.best).toBe(game.best);
@@ -100,7 +100,7 @@ describe('breakthrough hammer turns', () => {
     game.tray = [piece('square-2', 'square'), piece('single', 'spare'), null];
     for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) game.board[y][x] = { color: 'red' };
     const next = breakThrough(game, 'square', 0, 0)!;
-    expect(next.pickaxesLeft).toBe(2);
+    expect(next.pickaxesLeft).toBe(PICKAXE_USES - 1);
     expect(next.lastMove?.removedPositions).toHaveLength(4);
     expect(next.lastMove?.clearedPositions).toEqual([]);
     expect(next.lastMove?.points).toBe(4);
@@ -192,7 +192,7 @@ describe('breakthrough hammer turns', () => {
     game.tray = [piece('domino-h', 'first'), piece('domino-h', 'remaining'), null];
     game.status = 'over';
     const next = breakThrough(game, 'first', 0, 0)!;
-    expect(next.pickaxesLeft).toBe(2);
+    expect(next.pickaxesLeft).toBe(PICKAXE_USES - 1);
     expect(next.lastMove?.lines).toBe(0);
     expect(next.status).toBe('over');
     expect(isGameOver(next.board, next.tray)).toBe(true);
@@ -203,24 +203,28 @@ describe('breakthrough hammer turns', () => {
     game.tray = [null, piece('domino-h', 'last'), null];
     const ordinaryBoard = structuredClone(game.board);
     ordinaryBoard[0][0] = null;
-    const ordinary = placePiece({ ...game, board: ordinaryBoard, pickaxesLeft: 2 }, 'last', 0, 0)!;
+    const ordinary = placePiece({ ...game, board: ordinaryBoard, pickaxesLeft: PICKAXE_USES - 1 }, 'last', 0, 0)!;
     const next = breakThrough(game, 'last', 0, 0)!;
     expect(next).toEqual({ ...ordinary, lastMove: { ...ordinary.lastMove!, removedPositions: [{ x: 0, y: 0 }] } });
     expect(next.tray.every(Boolean)).toBe(true);
     expect(next.tray.every((block) => block!.id !== 'last')).toBe(true);
     expect(next.rngState).not.toBe(game.rngState);
-    expect(next.pickaxesLeft).toBe(2);
+    expect(next.pickaxesLeft).toBe(PICKAXE_USES - 1);
   });
 
-  it('allows exactly three successful hammer turns, then preserves an exhausted run', () => {
+  it('allows exactly five successful hammer turns, then preserves an exhausted run', () => {
     let game = fixture();
     game.tray = [piece('single', 'a'), piece('single', 'b'), piece('single', 'c')];
-    for (const [index, id] of ['a', 'b', 'c'].entries()) {
-      game = breakThrough(game, id, 0, 0)!;
+    for (let index = 0; index < PICKAXE_USES; index++) {
+      const choice = game.tray.flatMap((block) => block ? Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, anchor) => ({
+        x: anchor % BOARD_SIZE, y: Math.floor(anchor / BOARD_SIZE), block,
+      })).filter(({ x, y }) => (getPlacementObstacles(game.board, block, x, y)?.length ?? 0) > 0) : [])[0];
+      expect(choice).toBeDefined();
+      game = breakThrough(game, choice.block.id, choice.x, choice.y)!;
       expect(game.pickaxesLeft).toBe(PICKAXE_USES - index - 1);
       expect(game.moves).toBe(10 + index);
     }
-    const block = game.tray[0]!;
+    const block = game.tray.find((available) => available !== null)!;
     const target = Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => ({
       x: index % BOARD_SIZE, y: Math.floor(index / BOARD_SIZE),
     })).find(({ x, y }) => (getPlacementObstacles(game.board, block, x, y)?.length ?? 0) > 0)!;
@@ -235,12 +239,12 @@ describe('breakthrough hammer turns', () => {
     const block = used.tray[1]!;
     const target = getValidPlacements(used.board, block)[0];
     const next = placePiece(used, block.id, target.x, target.y)!;
-    expect(next.pickaxesLeft).toBe(2);
+    expect(next.pickaxesLeft).toBe(PICKAXE_USES - 1);
     expect(next.moves).toBe(used.moves + 1);
     expect(next.lastMove?.removedPositions).toBeUndefined();
   });
 
-  it('resets all three uses on restart while retaining the personal best', () => {
+  it('resets all five uses on restart while retaining the personal best', () => {
     const used = breakThrough(fixture(), 'corner', 0, 0)!;
     const restarted = restartGame(used, { seed: 'fresh-again' });
     expect(restarted.pickaxesLeft).toBe(PICKAXE_USES);

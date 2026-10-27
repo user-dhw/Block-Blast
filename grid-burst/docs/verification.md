@@ -79,3 +79,12 @@ The single-cell behavior above is historical. The current **Rescue** tool previe
 - The production build served under `/Block-Blast/` returned HTTP 200 with the expected image MIME types for every icon. The manifest resolved its launch URL and scope to `/Block-Blast/`, uses the name **Grid Burst** and requests standalone display.
 - ESLint and the production build passed. A real browser loaded the page, all 64 board buttons and the Apple icon/name metadata.
 - Actual iPhone installation, icon masking and standalone status-bar appearance require checking on the user's device. No offline/service-worker behavior is claimed.
+
+## October 27, 2026: five rescues and Free Play
+
+- Standard runs now start with **5** Rescue uses. A real-browser legacy save with one of the previous three uses left restored as **3/5**, kept its board and score, and stayed at **3/5** after another reload. A fresh standard run showed **5/5**.
+- The new **为所欲为 / Free Play** mode uses Casual pieces, allows direct placement over blockers with unlimited free rescue, offers free 90-degree rotation and tray replacement, and never ends because ordinary placements are blocked.
+- Browser checks rotated a piece, placed another over an occupied footprint, and replaced the tray while keeping the board, score and move count. Reloading preserved the rotated tray and progress. A blocked diagonal-gap fixture remained playable; placing a domino cleared a row and column for **252 points**.
+- Separate fixture records of **321** for standard play and **9,999** for Free Play stayed in their respective modes when switching in both directions. The temporary local fixtures were removed before the production build.
+- Responsive browser checks at **375×667**, **667×375** and **1265×711** confirmed all mode tabs and gameplay controls fit, with no horizontal document overflow. Physical iPhone touch behavior remains untested.
+- ESLint, **151 tests across 6 files**, and a production build with `PAGES_BASE_PATH=/Block-Blast/` passed. Tests cover five-use exhaustion, free rescue, rotation, tray replacement, seeded continuation, save migration and separate best-score records.
